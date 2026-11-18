@@ -1,0 +1,18 @@
+{
+  "name": "Steady — Chief of Staff OS",
+  "short_name": "Steady",
+  "description": "Personal AI Chief of Staff & 8-Agent Life OS for Palm Springs",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0A161A",
+  "theme_color": "#0B8C86",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
