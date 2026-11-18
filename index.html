@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Steady">
+<meta name="theme-color" content="#0B8C86">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="manifest" href="./manifest.json">
+<title>Steady — Chief of Staff &amp; Life OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./steady.css">
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <a class="brand" href="#today">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="13" r="8" fill="var(--sun)"/><rect x="3" y="21" width="26" height="3.5" rx="1.75" fill="var(--accent)"/><rect x="8" y="26.5" width="16" height="2.5" rx="1.25" fill="var(--accent)" opacity=".55"/></svg>
+      <div><b>Steady</b><small>Chief of Staff OS</small></div>
+    </a>
+    <nav class="nav" id="nav" aria-label="Primary Navigation"></nav>
+    <div class="rail-actions">
+      <button class="btn sun sm" id="wakeBtn" type="button">Morning Ignition</button>
+      <a id="fpill" href="#today"></a>
+      <div class="railmeta" id="sync">Saved on device</div>
+    </div>
+  </aside>
+  <main id="main" tabindex="-1"></main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="./steady-data.js"></script>
+<script src="./steady-engine.js"></script>
+<script src="./steady-views.js"></script>
+</body>
+</html>
