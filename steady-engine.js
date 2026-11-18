@@ -641,7 +641,7 @@ function executeAgentAction(svcId,agentId,op,actionKey){
     case 'gcal_push_now':{
       const cur=n.cur,st=slotMin(cur),en=st+45;
       const d=new Date(),ymd=d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
-      const dates=`${ymd}T${pad(Math.floor(st/60))}${pad(stMin%60||st%60)}00/${ymd}T${pad(Math.floor(en/60))}${pad(en%60)}00`;
+      const dates=`${ymd}T${pad(Math.floor(st/60))}${pad(st%60)}00/${ymd}T${pad(Math.floor(en/60))}${pad(en%60)}00`;
       const url=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('['+AG[cur.agent].name+'] '+cur.title)}&details=${encodeURIComponent(cur.detail)}&dates=${dates}`;
       logSync(agentId,'gcalendar','WRITE',`Anchor wrote block "${cur.title}" (${fmtMin(st)}) to Google Calendar (${c.account}).`);
       window.open(url,'_blank','noopener');
