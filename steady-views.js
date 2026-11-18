@@ -218,6 +218,7 @@ function renderAuthScreen(){
     const newUser={email:em,name:nm||em.split('@')[0],passHash:simpleHash(pw),isFounder:false,createdAt:Date.now()};
     accs[em]=newUser;
     saveAccounts(accs);
+    // Initialize fresh state for this user
     const fresh=freshUserDefaults(em,newUser.name);
     localStorage.setItem('steady.user.'+em,JSON.stringify(fresh));
     loginUser(newUser,true);
@@ -259,7 +260,10 @@ function renderAuthScreen(){
 let VIEW='today';
 
 function viewToday(){
-  const k=dkey(),ck=state.checks[k]||{},doneN=SLOTS.filter(s=>ck[s.id]).length,pct=Math.round(doneN/SLOTS.length*100);
+  const k=dkey(),ck=state.checks[k]||{};
+  const todayDayIdx=new Date().getDay();
+  const dayList=buildDaySchedule(selectedDayIdx);
+  const doneN=dayList.filter(s=>ck[s.id]).length,pct=dayList.length?Math.round(doneN/dayList.length*100):0;
   const n=slotNow(),cur=n.cur,b=getBig3(k),mDone=(state.morningDone[k]||{}).done;
   const prof=state.profile||{},pTarget=prof.proteinTarget||180,wTarget=prof.waterTarget||10;
   const prot=state.protein[k]||0,wat=state.water[k]||0,soc=state.social[k]||0;
@@ -280,7 +284,7 @@ function viewToday(){
       </div>
       <div class="grid-3" style="gap:10px">
         <div class="card soft" style="padding:10px"><b>1. Morning Ignition</b><p class="hint small">Tap "Morning Ignition" every morning for your reaffirmation, 60s breathing, reflection &amp; #1 priority.</p></div>
-        <div class="card soft" style="padding:10px"><b>2. Link Your Apps</b><p class="hint small">Tap any integration button or visit <b>Integrations</b> to connect Google Calendar, Sheets, Docs, Gmail, iMessage &amp; WhatsApp.</p></div>
+        <div class="card soft" style="padding:10px"><b>2. 3-Dot (⋯) Block Menu</b><p class="hint small">Click <b>⋯</b> on any activity block to edit content, change days/frequency (e.g. no weekend stock trading), share events, or block personal obligations.</p></div>
         <div class="card soft" style="padding:10px"><b>3. Edit Preferences</b><p class="hint small">Visit <b>Preferences</b> anytime to update your favorite dishes, workouts, ventures, or sports.</p></div>
       </div>
     </div>`:'';
@@ -297,11 +301,15 @@ function viewToday(){
       </div>
     </div>`:'';
 
+  const curAgName=(AG[cur.agent]&&AG[cur.agent].name)||'Steady';
   const nowCard=`
     <section class="card accent">
       <div class="hd">
         <p class="eyebrow">${n.before?'Starts at ':'Right Now · '}${fmtMin(slotMin(cur))}</p>
-        <span class="agent-pill">${esc(AG[cur.agent].name)}</span>
+        <div class="row">
+          <span class="agent-pill">${esc(curAgName)}</span>
+          <button class="btn sm ghost-accent" type="button" data-act="slot-menu" data-id="${cur.id}" title="Edit, Frequency &amp; Share">⋯ Options</button>
+        </div>
       </div>
       <h2>${esc(cur.title)}</h2>
       <p>${esc(cur.detail)}</p>
@@ -383,27 +391,50 @@ function viewToday(){
   const timelineCard=`
     <section class="card">
       <div class="hd">
-        <h3>Wake-to-Bed Schedule (${doneN}/${SLOTS.length})</h3>
+        <div>
+          <h3>${DAY_NAMES[selectedDayIdx]}${selectedDayIdx===todayDayIdx?' (Today)':''} Wake-to-Bed Schedule (${doneN}/${dayList.length})</h3>
+          <p class="hint small">Tap <b>⋯</b> on any block to edit, change frequency/days, move (auto-fills gaps), or share.</p>
+        </div>
         <div class="row">
+          <button class="btn sm sun" type="button" data-act="block-time">+ Block Personal Obligation</button>
           <button class="btn sm link" data-act="shift" data-n="-15">−15m</button>
           <button class="btn sm link" data-act="shift" data-n="15">+15m</button>
-          <button class="btn sm" data-act="export-ics">Sync Calendar (.ics)</button>
+          <button class="btn sm" data-act="export-ics">Sync (.ics)</button>
         </div>
+      </div>
+      <div class="day-bar" role="tablist" aria-label="View schedule by day of week">
+        ${DAY_NAMES.map((dn,i)=>`<button type="button" class="${i===selectedDayIdx?'on':''}" data-act="select-day" data-day="${i}">${dn}${i===todayDayIdx?' •':''}</button>`).join('')}
       </div>
       <div class="bar good"><i style="width:${pct}%"></i></div>
       <ol class="tl">
-        ${SLOTS.map(s=>{
-          const isCur=!n.before&&s.id===cur.id;
-          return `<li class="${ck[s.id]?'done ':''}${isCur?'cur':''}">
-            <span class="t">${fmtMin(slotMin(s)).replace(' am','a').replace(' pm','p')}</span>
+        ${dayList.map(s=>{
+          const isCur=(selectedDayIdx===todayDayIdx)&&!n.before&&s.id===cur.id;
+          const agName=(AG[s.agent]&&AG[s.agent].name)||'Steady';
+          const freqStr=fmtFreq(s.days,s.specificDate);
+          const rowCls=[ck[s.id]?'done':'',isCur?'cur':'',s.isObligation?'ob':'',s.isAutoFill?'autofill':''].filter(Boolean).join(' ');
+          return `<li class="${rowCls}">
+            <span class="t">${fmtMin(slotMin(s)).replace(' am','a').replace(' pm','p')}${s.dur?`<br><small class="hint" style="font-size:10px">${s.dur}m</small>`:''}</span>
             <div>
-              <div class="ttl">${esc(s.title)} <span class="tag">${esc(AG[s.agent].name)}</span>${isCur?'<span class="flag">NOW</span>':''}</div>
+              <div class="ttl">
+                <span>${esc(s.title)}</span>
+                ${s.isObligation?'<span class="tag sun">Personal Obligation</span>':`<span class="tag">${esc(agName)}</span>`}
+                ${s.isAutoFill?'<span class="tag good">Auto-Filled Gap</span>':''}
+                ${freqStr!=='Daily' && !s.isAutoFill?`<span class="freq-pill">${esc(freqStr)}</span>`:''}
+                ${isCur?'<span class="flag">NOW</span>':''}
+              </div>
               <p class="det">${esc(s.detail)}</p>
             </div>
-            <label class="chk"><input type="checkbox" data-field="slot" data-id="${s.id}" ${ck[s.id]?'checked':''}></label>
+            <div class="tl-ctrl">
+              <label class="chk"><input type="checkbox" data-field="slot" data-id="${s.id}" ${ck[s.id]?'checked':''}></label>
+              <button class="dots-btn" type="button" data-act="slot-menu" data-id="${s.id}" title="Edit content, modify day/frequency, or share event" aria-label="Options for ${esc(s.title)}">⋯</button>
+            </div>
           </li>`;
         }).join('')}
       </ol>
+      <div class="hd" style="padding-top:6px">
+        <button class="btn sm" type="button" data-act="add-custom-slot">+ Add Activity Block</button>
+        <button class="btn sm link" type="button" data-act="reset-slots">Reset Default Schedule</button>
+      </div>
     </section>`;
 
   const tasksAndWins=`
@@ -428,6 +459,7 @@ function viewToday(){
       </div>
       <div class="row">
         <button class="btn sun" data-act="open-morning">Morning Ignition</button>
+        <button class="btn" data-act="block-time">+ Block Obligation</button>
         <button class="btn" data-act="open-wizard">Personalize</button>
         <button class="btn" data-act="export-ics">Add to Calendar</button>
       </div>
@@ -1236,6 +1268,28 @@ function act(a,el){
     case 'dismiss-guide':state.profile.showGuide=false;save();render();break;
     case 'show-guide':state.profile.showGuide=true;save();location.hash='today';render();break;
     case 'close-modal':clearInterval(breathInterval);$('#modalRoot').innerHTML='';break;
+    case 'slot-menu':openSlotMenuModal(d.id);break;
+    case 'block-time':openBlockTimeModal();break;
+    case 'select-day':selectedDayIdx=+d.day;render();break;
+    case 'add-custom-slot':{
+      const newId='slot_'+rid();
+      state.customSlots.push({
+        id:newId,t:'15:00',dur:45,days:[0,1,2,3,4,5,6],
+        title:'New Custom Activity Block',
+        detail:'Added to your schedule — customize time, days, and agent.',
+        agent:'anchor'
+      });
+      state.customSlots.sort((a,b)=>mins(a.t)-mins(b.t));
+      save();render();
+      openSlotMenuModal(newId);
+      break;
+    }
+    case 'reset-slots':{
+      state.customSlots=JSON.parse(JSON.stringify(SLOTS));
+      save();render();
+      toast('Schedule reset to default wake-to-bed template.');
+      break;
+    }
     case 'slot':{const c=state.checks[k]=state.checks[k]||{};c[d.id]=!c[d.id];save();render();break;}
     case 'focus-start':startFocus(+d.min);break;
     case 'focus-end':finishFocus(false);break;
