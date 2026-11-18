@@ -17,7 +17,8 @@
 <link rel="stylesheet" href="./steady.css">
 </head>
 <body>
-<div class="app">
+<div id="authRoot" hidden></div>
+<div class="app" id="appShell" hidden>
   <aside class="rail">
     <a class="brand" href="#today">
       <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="13" r="8" fill="var(--sun)"/><rect x="3" y="21" width="26" height="3.5" rx="1.75" fill="var(--accent)"/><rect x="8" y="26.5" width="16" height="2.5" rx="1.25" fill="var(--accent)" opacity=".55"/></svg>
@@ -25,6 +26,10 @@
     </a>
     <nav class="nav" id="nav" aria-label="Primary Navigation"></nav>
     <div class="rail-actions">
+      <div class="user-chip" id="userChip">
+        <div><b id="userNameDisp">User</b><span class="hint small mono" id="userEmailDisp"></span></div>
+        <button class="btn sm link" id="logoutBtn" type="button" title="Log Out / Switch User">Log Out</button>
+      </div>
       <button class="btn sun sm" id="wakeBtn" type="button">Morning Ignition</button>
       <a id="fpill" href="#today"></a>
       <div class="railmeta" id="sync">Saved on device</div>
