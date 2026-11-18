@@ -1,13 +1,475 @@
-/* ---------- Schedule & Helpers ---------- */
-const slotMin=s=>mins(s.t)+(state.shift||0);
-function slotNow(){
-  const n=nowMin();let idx=-1;
-  SLOTS.forEach((s,i)=>{if(slotMin(s)<=n)idx=i;});
-  return {cur:SLOTS[idx<0?0:idx],next:SLOTS[idx+1]||null,idx:idx,before:idx<0};
+/* ---------- Dynamic Schedule, Frequency, Gap Auto-Refill & Personal Obligations ---------- */
+let selectedDayIdx=new Date().getDay(); // 0=Sun .. 6=Sat
+
+const slotMin=s=>mins(s.t)+(s.isObligation?0:(state.shift||0));
+const minToHHMM=m=>{m=((m%1440)+1440)%1440;return pad(Math.floor(m/60))+':'+pad(m%60);};
+
+function fmtFreq(days,specificDate){
+  if(specificDate)return 'Once ('+specificDate.slice(5)+')';
+  const d=Array.isArray(days)?days.slice().sort():[0,1,2,3,4,5,6];
+  if(d.length>=7)return 'Daily';
+  const s=d.join(',');
+  if(s==='1,2,3,4,5')return 'Weekdays (Mon–Fri)';
+  if(s==='0,6')return 'Weekends (Sat–Sun)';
+  if(s==='1,3,5')return 'Mon · Wed · Fri';
+  if(s==='2,4,6')return 'Tue · Thu · Sat';
+  if(s==='2,4')return 'Tue · Thu';
+  return d.map(i=>DAY_NAMES[i]).join(', ');
 }
+
+function pickLogicalFill(mTime,origSlot){
+  if(origSlot&&origSlot.fallback){
+    return {
+      title:origSlot.fallback.title,
+      detail:origSlot.fallback.detail,
+      agent:origSlot.fallback.agent||'anchor'
+    };
+  }
+  const match=GAP_POOL.find(g=>mTime>=g.minStart&&mTime<g.minEnd)||GAP_POOL[2];
+  return {title:match.title,detail:match.detail,agent:match.agent};
+}
+
+function buildDaySchedule(dayIdx){
+  const dIdx=typeof dayIdx==='number'?dayIdx:selectedDayIdx;
+  const slots=Array.isArray(state.customSlots)&&state.customSlots.length?state.customSlots:SLOTS;
+  const todayStr=dkey();
+
+  // 1. Separate Personal Obligations active on this day vs regular/custom agent blocks
+  const obligations=[];
+  const activeRegular=[];
+
+  slots.forEach(s=>{
+    const days=Array.isArray(s.days)?s.days:[0,1,2,3,4,5,6];
+    const dateMatch=s.specificDate?(s.specificDate===todayStr && dIdx===new Date().getDay()):days.indexOf(dIdx)>=0;
+    if(s.isObligation){
+      if(dateMatch)obligations.push(Object.assign({},s));
+    } else if(dateMatch){
+      activeRegular.push(Object.assign({},s));
+    } else {
+      // Off-day for a recurring slot (e.g., No Stock Market on Weekend, or No DIY today):
+      // Auto-refill this time window with a logical substitute activity!
+      const fill=pickLogicalFill(mins(s.t),s);
+      activeRegular.push({
+        id:s.id,
+        t:s.t,
+        dur:s.dur||45,
+        days:s.days,
+        title:fill.title,
+        detail:fill.detail+' (Auto-filled on '+DAY_NAMES[dIdx]+' while "'+s.title+'" is off)',
+        agent:fill.agent,
+        isAutoFill:true,
+        origTitle:s.title
+      });
+    }
+  });
+
+  // 2. If any Personal Obligation overlaps a regular block, let the Personal Obligation claim the time window
+  //    and shift or trim the overlapped block so there are no collisions
+  const resolved=[];
+  obligations.forEach(ob=>resolved.push(ob));
+
+  activeRegular.forEach(reg=>{
+    const rStart=slotMin(reg),rEnd=rStart+(reg.dur||45);
+    const conflict=obligations.find(ob=>{
+      const oStart=slotMin(ob),oEnd=oStart+(ob.dur||60);
+      return rStart<oEnd && (rStart+15)>oStart;
+    });
+    if(!conflict){
+      resolved.push(reg);
+    } else {
+      // Shift displaced block to right after the personal obligation if there's room before the next block
+      const afterMin=slotMin(conflict)+(conflict.dur||60);
+      const nextSame=activeRegular.some(other=>other.id!==reg.id && Math.abs(slotMin(other)-afterMin)<25);
+      if(!nextSame && afterMin<1320){
+        const shifted=Object.assign({},reg,{
+          t:minToHHMM(afterMin-(state.shift||0)),
+          detail:reg.detail+' (Shifted around "'+conflict.title+'")',
+          wasShifted:true
+        });
+        resolved.push(shifted);
+      }
+    }
+  });
+
+  resolved.sort((a,b)=>slotMin(a)-slotMin(b));
+
+  // 3. Detect any large unscheduled gap (>= 50 mins) created when a block was moved to another time
+  //    and automatically insert a logical gap-filler activity
+  const withGaps=[];
+  for(let i=0;i<resolved.length;i++){
+    const cur=resolved[i];
+    withGaps.push(cur);
+    if(i<resolved.length-1){
+      const curEnd=slotMin(cur)+(cur.dur||45);
+      const nxtStart=slotMin(resolved[i+1]);
+      if(nxtStart-curEnd>=50 && curEnd>=360 && curEnd<=1230){
+        const gapStartRaw=curEnd-(state.shift||0);
+        const fill=pickLogicalFill(curEnd,null);
+        withGaps.push({
+          id:'autofill_'+gapStartRaw,
+          t:minToHHMM(gapStartRaw),
+          dur:nxtStart-curEnd,
+          days:[0,1,2,3,4,5,6],
+          title:fill.title,
+          detail:fill.detail+' (Logical activity auto-filled into open '+Math.round(nxtStart-curEnd)+'m window)',
+          agent:fill.agent,
+          isAutoFill:true,
+          isGapInsert:true
+        });
+      }
+    }
+  }
+  return withGaps;
+}
+
+function slotNow(){
+  const list=buildDaySchedule(new Date().getDay());
+  const n=nowMin();let idx=-1;
+  list.forEach((s,i)=>{if(slotMin(s)<=n)idx=i;});
+  return {cur:list[idx<0?0:idx]||SLOTS[0],next:list[idx+1]||null,idx:idx,before:idx<0,list:list};
+}
+
 function getBig3(k){const b=state.big3[k];return b&&b.length===3?b:[{t:'',done:false},{t:'',done:false},{t:'',done:false}];}
 function ensureBig3(k){if(!state.big3[k]||state.big3[k].length!==3)state.big3[k]=[{t:'',done:false},{t:'',done:false},{t:'',done:false}];return state.big3[k];}
 function week(){const k=wkey();return state.week[k]||{convos:0,shipped:0,flipsListed:0};}
+
+/* ---------- 3-Dot Activity Block Menu Modal (Edit Content, Day/Frequency, Move & Share) ---------- */
+function openSlotMenuModal(slotId){
+  const dayList=buildDaySchedule(selectedDayIdx);
+  const rendered=dayList.find(x=>x.id===slotId);
+  let raw=state.customSlots.find(x=>x.id===slotId);
+
+  // If user clicked 3-dots on an auto-generated gap filler, let them customize & promote it into customSlots
+  if(!raw && rendered){
+    raw={
+      id:rendered.id,
+      t:rendered.t,
+      dur:rendered.dur||45,
+      days:[0,1,2,3,4,5,6],
+      title:rendered.title,
+      detail:rendered.detail,
+      agent:rendered.agent||'anchor',
+      isAutoFill:true
+    };
+  }
+  if(!raw)return;
+
+  let draftDays=Array.isArray(raw.days)?raw.days.slice():[0,1,2,3,4,5,6];
+  const stMin=slotMin(rendered||raw);
+  const d=new Date(),ymd=d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
+  const enMin=stMin+(raw.dur||45);
+  const gcalDates=`${ymd}T${pad(Math.floor(stMin/60))}${pad(stMin%60)}00/${ymd}T${pad(Math.floor(enMin/60))}${pad(enMin%60)}00`;
+  const shareTitle=(rendered?rendered.title:raw.title);
+  const shareDetail=(rendered?rendered.detail:raw.detail);
+  const shareSummary=`${shareTitle} (${fmtMin(stMin)} · ${fmtFreq(draftDays,raw.specificDate)}) — ${shareDetail}`;
+  const gcalUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('[Steady] '+shareTitle)}&details=${encodeURIComponent(shareDetail)}&dates=${gcalDates}`;
+
+  function paintSlotModal(){
+    const root=$('#modalRoot');
+    root.innerHTML=`
+      <div class="modal-backdrop">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="slModalTitle">
+          <div class="hd">
+            <div>
+              <p class="eyebrow">Activity Block Options · ${esc(fmtMin(stMin))}</p>
+              <h2 id="slModalTitle">Edit, Frequency &amp; Share</h2>
+            </div>
+            <button class="btn sm" type="button" data-act="close-modal">Close</button>
+          </div>
+
+          ${rendered&&rendered.isAutoFill?`
+            <div class="card sun">
+              <div class="hd">
+                <div>
+                  <b>Auto-Filled Logical Activity</b>
+                  <p class="hint small">${raw.origTitle?`Filling in while "${esc(raw.origTitle)}" is off on ${DAY_NAMES[selectedDayIdx]}.`:'Automatically filling an open calendar window.'}</p>
+                </div>
+                <button class="btn sm" type="button" id="swapLogicalBtn">↻ Swap Activity</button>
+              </div>
+            </div>
+          `:''}
+
+          <div class="card">
+            <span class="lab">1. Edit Activity Content &amp; Time</span>
+            <div>
+              <label class="lab" for="slTitle">Activity Title</label>
+              <input type="text" id="slTitle" value="${esc(raw.title)}">
+            </div>
+            <div class="grid-3" style="gap:10px">
+              <div>
+                <label class="lab" for="slTime">Start Time</label>
+                <input type="time" id="slTime" value="${esc(raw.t)}">
+              </div>
+              <div>
+                <label class="lab" for="slDur">Duration (mins)</label>
+                <input type="number" id="slDur" value="${esc(raw.dur||45)}" min="10" max="360" step="5">
+              </div>
+              <div>
+                <label class="lab" for="slAgent">Domain / Agent</label>
+                <select id="slAgent">
+                  ${Object.keys(AG).filter(k=>k!=='chief').map(k=>`<option value="${k}" ${raw.agent===k?'selected':''}>${esc(AG[k].name)} (${esc(clip(AG[k].role,22))})</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="lab" for="slDetail">Details &amp; Coaching Notes</label>
+              <textarea id="slDetail" rows="2">${esc(raw.detail)}</textarea>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="hd">
+              <span class="lab" style="margin:0">2. Modify Day &amp; Frequency (${esc(fmtFreq(draftDays))})</span>
+              <span class="hint small">Unchecked days auto-fill with a logical activity</span>
+            </div>
+            <div class="row">
+              <button class="btn sm" type="button" data-freq-preset="0,1,2,3,4,5,6">Every Day</button>
+              <button class="btn sm" type="button" data-freq-preset="1,2,3,4,5">Weekdays (No Weekend Trading)</button>
+              <button class="btn sm" type="button" data-freq-preset="2,4,6">Tue / Thu / Sat (DIY)</button>
+              <button class="btn sm" type="button" data-freq-preset="1,3,5">Mon / Wed / Fri</button>
+              <button class="btn sm" type="button" data-freq-preset="0,6">Weekends Only</button>
+            </div>
+            <div class="day-bar">
+              ${DAY_NAMES.map((dn,i)=>{
+                const on=draftDays.indexOf(i)>=0;
+                return `<button type="button" class="${on?'on':''}" data-toggle-day="${i}">${on?'✓ ':''}${dn}</button>`;
+              }).join('')}
+            </div>
+            ${!raw.isObligation?`
+              <div>
+                <label class="lab" for="slFallback">Off-Day Logical Substitute Activity (Optional)</label>
+                <input type="text" id="slFallback" value="${esc((raw.fallback&&raw.fallback.title)||'')}" placeholder="Leave blank for Chief’s smart time-of-day activity">
+              </div>
+            `:''}
+          </div>
+
+          <div class="card soft">
+            <span class="lab">3. Share Event</span>
+            <div class="row">
+              <button class="btn sm solid" type="button" id="slNativeShareBtn">Share / Send Invite</button>
+              <a class="btn sm" href="${gcalUrl}" target="_blank" rel="noopener">Google Calendar ↗</a>
+              <a class="btn sm" href="sms:?&body=${encodeURIComponent(shareSummary)}">Apple Messages</a>
+              <a class="btn sm" href="https://wa.me/?text=${encodeURIComponent(shareSummary)}" target="_blank" rel="noopener">WhatsApp ↗</a>
+              <a class="btn sm" href="https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent('Event: '+shareTitle)}&body=${encodeURIComponent(shareSummary)}" target="_blank" rel="noopener">Gmail ↗</a>
+              <button class="btn sm" type="button" id="slCopyShareBtn">Copy Details</button>
+            </div>
+          </div>
+
+          <div class="row" style="justify-content:space-between">
+            <button class="btn sm" type="button" id="slDeleteBtn" style="color:var(--crit)">Remove Block</button>
+            <div class="row">
+              <button class="btn" type="button" data-act="close-modal">Cancel</button>
+              <button class="btn solid" type="button" id="slSaveBtn">Save &amp; Refresh Calendar</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    const swapBtn=$('#swapLogicalBtn');
+    if(swapBtn)swapBtn.onclick=()=>{
+      const curIdx=GAP_POOL.findIndex(g=>g.title===$('#slTitle').value);
+      const nextG=GAP_POOL[(curIdx+1)%GAP_POOL.length];
+      $('#slTitle').value=nextG.title;
+      $('#slDetail').value=nextG.detail;
+      $('#slAgent').value=nextG.agent;
+      toast('Swapped to: '+nextG.title);
+    };
+
+    root.querySelectorAll('[data-freq-preset]').forEach(btn=>{
+      btn.onclick=()=>{
+        raw.title=$('#slTitle').value;
+        raw.t=$('#slTime').value;
+        raw.dur=+$('#slDur').value||45;
+        raw.agent=$('#slAgent').value;
+        raw.detail=$('#slDetail').value;
+        draftDays=btn.dataset.freqPreset.split(',').map(Number);
+        paintSlotModal();
+      };
+    });
+
+    root.querySelectorAll('[data-toggle-day]').forEach(btn=>{
+      btn.onclick=()=>{
+        raw.title=$('#slTitle').value;
+        raw.t=$('#slTime').value;
+        raw.dur=+$('#slDur').value||45;
+        raw.agent=$('#slAgent').value;
+        raw.detail=$('#slDetail').value;
+        const dNum=+btn.dataset.toggleDay;
+        const idx=draftDays.indexOf(dNum);
+        if(idx>=0)draftDays.splice(idx,1);
+        else draftDays.push(dNum);
+        draftDays.sort();
+        paintSlotModal();
+      };
+    });
+
+    $('#slNativeShareBtn').onclick=()=>{
+      if(navigator.share){
+        navigator.share({title:shareTitle,text:shareSummary}).catch(()=>{});
+      } else {
+        copyText(shareSummary,'Event details copied to clipboard to share!');
+      }
+    };
+    $('#slCopyShareBtn').onclick=()=>copyText(shareSummary,'Copied event details to clipboard!');
+
+    $('#slDeleteBtn').onclick=()=>{
+      state.customSlots=state.customSlots.filter(x=>x.id!==raw.id);
+      save();
+      root.innerHTML='';
+      render();
+      toast('Block removed. Calendar refreshed to fill any open gap with a logical activity.');
+    };
+
+    $('#slSaveBtn').onclick=()=>{
+      const oldT=raw.t;
+      const newT=$('#slTime').value||raw.t;
+      const newTitle=$('#slTitle').value.trim()||raw.title;
+      const newDur=+$('#slDur').value||45;
+      const newAgent=$('#slAgent').value;
+      const newDetail=$('#slDetail').value.trim();
+      const fbEl=$('#slFallback');
+      const fbTitle=fbEl?fbEl.value.trim():'';
+
+      let target=state.customSlots.find(x=>x.id===raw.id);
+      if(!target){
+        target={id:'custom_'+rid()};
+        state.customSlots.push(target);
+      }
+      target.title=newTitle;
+      target.t=newT;
+      target.dur=newDur;
+      target.agent=newAgent;
+      target.detail=newDetail;
+      target.days=draftDays.slice();
+      target.isObligation=(newAgent==='personal')||!!raw.isObligation;
+      if(fbTitle){
+        target.fallback={title:fbTitle,detail:'Custom substitute activity when '+newTitle+' is off.',agent:'anchor'};
+      }
+
+      // If the block was moved to a new time (>= 35m difference), check if the old time slot is now empty
+      // and insert a logical gap-filler slot at oldT if no other block occupies oldT
+      let refilledMsg='';
+      if(oldT && oldT!==newT && Math.abs(mins(oldT)-mins(newT))>=30){
+        const occupied=state.customSlots.some(x=>x.id!==target.id && Math.abs(mins(x.t)-mins(oldT))<30);
+        if(!occupied){
+          const fill=pickLogicalFill(mins(oldT),target);
+          state.customSlots.push({
+            id:'refill_'+rid(),
+            t:oldT,
+            dur:45,
+            days:[0,1,2,3,4,5,6],
+            title:fill.title,
+            detail:fill.detail+' (Auto-filled after moving "'+newTitle+'" to '+fmtMin(mins(newT))+')',
+            agent:fill.agent
+          });
+          refilledMsg=' & filled '+fmtMin(mins(oldT))+' with "'+fill.title+'"';
+        }
+      }
+
+      state.customSlots.sort((a,b)=>mins(a.t)-mins(b.t));
+      save();
+      root.innerHTML='';
+      render();
+      toast('Saved "'+newTitle+'" ('+fmtFreq(target.days)+')'+refilledMsg+'!');
+    };
+  }
+
+  paintSlotModal();
+}
+
+/* ---------- Block Time for Personal Obligations Outside of App ---------- */
+function openBlockTimeModal(){
+  const root=$('#modalRoot');
+  let obDays=[selectedDayIdx];
+  function paintObModal(draft){
+    draft=draft||{title:'',t:'10:00',dur:60,detail:'External personal obligation — agent tasks paused during this window.',mode:'today'};
+    root.innerHTML=`
+      <div class="modal-backdrop">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="obModalTitle">
+          <div class="hd">
+            <div>
+              <p class="eyebrow">External Calendar Guardrail</p>
+              <h2 id="obModalTitle">Block Time for Personal Obligation</h2>
+            </div>
+            <button class="btn sm" type="button" data-act="close-modal">Close</button>
+          </div>
+          <p class="hint">Block out time for doctor appointments, kids’ school events, errands, golf tee times, or personal commitments outside the app. Steady will automatically shift overlapping blocks around your obligation.</p>
+          <div class="card sun">
+            <div>
+              <label class="lab" for="obTitle">Obligation / Appointment Name</label>
+              <input type="text" id="obTitle" value="${esc(draft.title)}" placeholder="e.g., Doctor Appointment, Son’s School Event, Errands">
+            </div>
+            <div class="grid-2 equal" style="gap:10px">
+              <div>
+                <label class="lab" for="obTime">Start Time</label>
+                <input type="time" id="obTime" value="${esc(draft.t)}">
+              </div>
+              <div>
+                <label class="lab" for="obDur">Duration (Minutes)</label>
+                <input type="number" id="obDur" value="${esc(draft.dur)}" min="15" max="480" step="15">
+              </div>
+            </div>
+            <div>
+              <label class="lab" for="obDetail">Location / Notes</label>
+              <input type="text" id="obDetail" value="${esc(draft.detail)}" placeholder="Location or reminder note…">
+            </div>
+            <div>
+              <label class="lab">Which Days?</label>
+              <div class="row" style="margin-bottom:6px">
+                <button class="btn sm" type="button" id="obTodayOnlyBtn">Selected Day (${DAY_NAMES[selectedDayIdx]})</button>
+                <button class="btn sm" type="button" id="obWeekdaysBtn">Weekdays (Mon–Fri)</button>
+                <button class="btn sm" type="button" id="obAllDaysBtn">Every Day</button>
+              </div>
+              <div class="day-bar">
+                ${DAY_NAMES.map((dn,i)=>{
+                  const on=obDays.indexOf(i)>=0;
+                  return `<button type="button" class="${on?'on':''}" data-ob-day="${i}">${on?'✓ ':''}${dn}</button>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+          <div class="row" style="justify-content:flex-end">
+            <button class="btn" type="button" data-act="close-modal">Cancel</button>
+            <button class="btn solid" type="button" id="obSaveBtn">Lock Personal Obligation &amp; Refresh Schedule</button>
+          </div>
+        </div>
+      </div>`;
+
+    const curDraft=()=>({title:$('#obTitle').value,t:$('#obTime').value,dur:+$('#obDur').value||60,detail:$('#obDetail').value});
+    $('#obTodayOnlyBtn').onclick=()=>{obDays=[selectedDayIdx];paintObModal(curDraft());};
+    $('#obWeekdaysBtn').onclick=()=>{obDays=[1,2,3,4,5];paintObModal(curDraft());};
+    $('#obAllDaysBtn').onclick=()=>{obDays=[0,1,2,3,4,5,6];paintObModal(curDraft());};
+    root.querySelectorAll('[data-ob-day]').forEach(btn=>{
+      btn.onclick=()=>{
+        const dNum=+btn.dataset.obDay,idx=obDays.indexOf(dNum);
+        if(idx>=0)obDays.splice(idx,1);else obDays.push(dNum);
+        obDays.sort();
+        paintObModal(curDraft());
+      };
+    });
+
+    $('#obSaveBtn').onclick=()=>{
+      const d=curDraft();
+      if(!d.title.trim()){toast('Please enter a title for your personal obligation.');return;}
+      state.customSlots.push({
+        id:'ob_'+rid(),
+        t:d.t||'10:00',
+        dur:d.dur||60,
+        days:obDays.length?obDays.slice():[selectedDayIdx],
+        title:d.title.trim(),
+        detail:d.detail.trim()||'Blocked personal obligation outside of app.',
+        agent:'personal',
+        isObligation:true
+      });
+      state.customSlots.sort((a,b)=>mins(a.t)-mins(b.t));
+      save();
+      root.innerHTML='';
+      render();
+      toast('Blocked '+fmtMin(mins(d.t))+' for "'+d.title.trim()+'" and adjusted overlapping blocks!');
+    };
+  }
+  paintObModal();
+}
 
 /* ---------- Toast & Notifications ---------- */
 let toastT=null;
@@ -52,18 +514,20 @@ function finishFocus(done){
 function exportIcs(){
   const d=new Date(),ymd=d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
   let ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Steady//Chief of Staff OS//EN'];
-  SLOTS.forEach((s,i)=>{
-    const st=slotMin(s),en=i<SLOTS.length-1?slotMin(SLOTS[i+1]):st+30;
+  const list=buildDaySchedule(selectedDayIdx);
+  list.forEach((s,i)=>{
+    const st=slotMin(s),en=s.dur?(st+s.dur):(i<list.length-1?slotMin(list[i+1]):st+30);
     const sh=pad(Math.floor(st/60)),sm=pad(st%60),eh=pad(Math.floor(en/60)),em=pad(en%60);
-    ics.push('BEGIN:VEVENT','DTSTART:'+ymd+'T'+sh+sm+'00','DTEND:'+ymd+'T'+eh+em+'00','SUMMARY:['+AG[s.agent].name+'] '+s.title,'DESCRIPTION:'+s.detail.replace(/\n/g,' '),'END:VEVENT');
+    const agName=(AG[s.agent]&&AG[s.agent].name)||'Steady';
+    ics.push('BEGIN:VEVENT','DTSTART:'+ymd+'T'+sh+sm+'00','DTEND:'+ymd+'T'+eh+em+'00','SUMMARY:['+agName+'] '+s.title,'DESCRIPTION:'+s.detail.replace(/\n/g,' '),'END:VEVENT');
   });
   ics.push('END:VCALENDAR');
   const blob=new Blob([ics.join('\r\n')],{type:'text/calendar;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='steady-schedule-'+dkey()+'.ics';
+  a.download='steady-schedule-'+DAY_NAMES[selectedDayIdx]+'-'+dkey()+'.ics';
   a.click();
-  toast('Downloaded .ics file — opens directly in iPhone/Mac Calendar or Google Calendar.');
+  toast('Downloaded .ics file for '+DAY_NAMES[selectedDayIdx]+' — opens in iPhone/Mac or Google Calendar.');
 }
 
 /* ---------- External App Integrations & Agent Read/Write/Modify Engine ---------- */
@@ -177,7 +641,7 @@ function executeAgentAction(svcId,agentId,op,actionKey){
     case 'gcal_push_now':{
       const cur=n.cur,st=slotMin(cur),en=st+45;
       const d=new Date(),ymd=d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
-      const dates=`${ymd}T${pad(Math.floor(st/60))}${pad(st%60)}00/${ymd}T${pad(Math.floor(en/60))}${pad(en%60)}00`;
+      const dates=`${ymd}T${pad(Math.floor(st/60))}${pad(stMin%60||st%60)}00/${ymd}T${pad(Math.floor(en/60))}${pad(en%60)}00`;
       const url=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('['+AG[cur.agent].name+'] '+cur.title)}&details=${encodeURIComponent(cur.detail)}&dates=${dates}`;
       logSync(agentId,'gcalendar','WRITE',`Anchor wrote block "${cur.title}" (${fmtMin(st)}) to Google Calendar (${c.account}).`);
       window.open(url,'_blank','noopener');
@@ -668,7 +1132,7 @@ function paintOnboardingModal(){
         <div>
           <label class="lab">Dietary Approach</label>
           <select data-wiz="dietStyle">
-            ${['High-Protein Whole Foods','High-Protein Mediterranean','Low-Carb / Keto High-Protein','Dairy-Light High-Protein','Family-Friendly High-Protein'].map(s=>`<option ${d.dietStyle===s?'selected':''}>${esc(s)}</option>`).join('')}
+            ${['High-Protein Whole Foods','High-Protein Mediterranean','Low-Carb / Keto High-Protein',' Dairy-Light High-Protein','Family-Friendly High-Protein'].map(s=>`<option ${d.dietStyle===s?'selected':''}>${esc(s)}</option>`).join('')}
           </select>
         </div>
       </div>`;
@@ -865,13 +1329,16 @@ function applyOnboardingWizard(){
   p.affirmation=d.affirmation.trim()||AFFIRMATIONS[0];
   p.onboarded=true;
 
+  // Adjust schedule shift from wakeTime vs default 06:00
   state.shift=Math.max(-90,Math.min(180,mins(p.wakeTime)-mins('06:00')));
 
+  // Distribute favorite dishes across Mon-Sun meal plan
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   days.forEach((day,i)=>{
     state.mealPlan[day]=p.favoriteDishes[i%p.favoriteDishes.length];
   });
 
+  // Seed ventures if provided
   if(d.venture1.trim()){
     if(state.ventures.length){
       state.ventures[0].name=d.venture1.trim();
@@ -885,6 +1352,7 @@ function applyOnboardingWizard(){
     state.ventures.push({id:rid(),name:d.venture2.trim(),stage:0,next:'Parked until active venture reaches revenue',active:false});
   }
 
+  // Seed watchlist tickers
   if(d.tickers.trim()){
     const syms=d.tickers.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
     if(syms.length){
@@ -892,10 +1360,12 @@ function applyOnboardingWizard(){
     }
   }
 
+  // Seed deal hunt
   if(d.hunt1.trim()&&!state.hunts.length){
     state.hunts.push({id:rid(),item:d.hunt1.trim(),maxBuy:+d.hunt1Max||250,estSell:(+d.hunt1Max||250)*1.8,purpose:p.resellerLicense?'Resell Flip':'Personal Deal'});
   }
 
+  // Seed DIY project
   if(d.diyTitle.trim()&&!state.projects.length){
     state.projects.push({
       id:rid(),title:d.diyTitle.trim(),cat:'Home / Auto DIY',
@@ -909,6 +1379,7 @@ function applyOnboardingWizard(){
     });
   }
 
+  // Update account display name
   if(currentUser){
     currentUser.name=p.name;
     const accs=loadAccounts();
