@@ -1,12 +1,289 @@
+/* ---------- Multi-User Auth Gate & Session Controller ---------- */
+let authMode='login';
+let resetState={email:'',code:'',sent:false};
+
+function updateUserChip(){
+  const nm=$('#userNameDisp'),em=$('#userEmailDisp');
+  if(nm&&currentUser)nm.textContent=(state.profile&&state.profile.name)||currentUser.name||'User';
+  if(em&&currentUser)em.textContent=currentUser.email;
+}
+
+function loginUser(user,isNewAccount){
+  currentUser=user;
+  try{localStorage.setItem(SESS_KEY,user.email);}catch(e){}
+  loadUserData(user);
+  $('#authRoot').hidden=true;
+  $('#appShell').hidden=false;
+  updateUserChip();
+  setSync();
+  route();
+  if(isNewAccount||!state.profile.onboarded){
+    openOnboardingModal(1);
+  }
+}
+
+function logoutUser(){
+  if(focus)finishFocus(false);
+  currentUser=null;
+  try{localStorage.removeItem(SESS_KEY);}catch(e){}
+  $('#modalRoot').innerHTML='';
+  $('#appShell').hidden=true;
+  $('#authRoot').hidden=false;
+  authMode='login';
+  renderAuthScreen();
+  toast('Logged out. Your data is safely stored in your private account.');
+}
+
+function renderAuthScreen(){
+  const root=$('#authRoot');if(!root)return;
+  const accs=Object.values(loadAccounts());
+  let formHtml='';
+
+  if(authMode==='login'){
+    formHtml=`
+      <div>
+        <p class="eyebrow">Private Multi-User Life OS</p>
+        <h1 style="margin-top:4px">Sign in to Steady</h1>
+        <p class="hint">Each account keeps its own private data, app integrations, meal plan, ventures, and preferences.</p>
+      </div>
+      <form class="stack" id="loginForm" style="gap:12px">
+        <div>
+          <label class="lab" for="authEmail">Username (Email Address)</label>
+          <input type="email" id="authEmail" placeholder="you@example.com" required autocomplete="username">
+        </div>
+        <div>
+          <div class="hd">
+            <label class="lab" for="authPass">Password</label>
+            <button class="btn sm link" type="button" id="goResetBtn">Forgot password?</button>
+          </div>
+          <input type="password" id="authPass" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+        <button class="btn solid" type="submit">Sign In to My Experience</button>
+      </form>
+      <div class="sec">
+        <div class="hd">
+          <span class="hint small">New to Steady? Start fresh with guided setup:</span>
+          <button class="btn sm sun" type="button" id="goSignupBtn">Create New Account</button>
+        </div>
+      </div>
+      ${accs.length?`
+        <div class="sec">
+          <span class="lab">Saved Profiles on This Device (Isolated Data)</span>
+          <div class="stack" style="gap:6px">
+            ${accs.map(a=>`
+              <div class="card soft" style="padding:10px 12px">
+                <div class="hd">
+                  <div>
+                    <b>${esc(a.name)}</b> ${a.isFounder?'<span class="tag sun">Founder Preset</span>':'<span class="tag">Personal</span>'}
+                    <p class="hint small mono">${esc(a.email)}</p>
+                  </div>
+                  <button class="btn sm" type="button" data-quick-email="${esc(a.email)}">${a.isFounder?'1-Click Founder Login':'Select'}</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `:''}`;
+  } else if(authMode==='signup'){
+    formHtml=`
+      <div>
+        <p class="eyebrow">Start From Scratch · Guided Personalization</p>
+        <h1 style="margin-top:4px">Create Your Account</h1>
+        <p class="hint">Your new account starts completely fresh with unlinked app connectors and launches a 6-module wizard to customize your dishes, workouts, business ideas, and activities.</p>
+      </div>
+      <form class="stack" id="signupForm" style="gap:12px">
+        <div>
+          <label class="lab" for="regName">Your First Name</label>
+          <input type="text" id="regName" placeholder="e.g., Alex" required>
+        </div>
+        <div>
+          <label class="lab" for="regEmail">Username (Email Address)</label>
+          <input type="email" id="regEmail" placeholder="alex@example.com" required autocomplete="username">
+        </div>
+        <div>
+          <label class="lab" for="regPass">Create Password (min 4 chars)</label>
+          <input type="password" id="regPass" placeholder="Create a password" required autocomplete="new-password">
+        </div>
+        <button class="btn solid" type="submit">Create Account &amp; Start Personalization →</button>
+      </form>
+      <div class="sec">
+        <button class="btn sm link" type="button" id="backLoginBtn">← Already have an account? Sign In</button>
+      </div>`;
+  } else {
+    formHtml=`
+      <div>
+        <p class="eyebrow">Account Recovery</p>
+        <h1 style="margin-top:4px">Reset Password via Email</h1>
+        <p class="hint">Enter your account email address to send a 6-digit recovery code to your email and set a new password.</p>
+      </div>
+      <form class="stack" id="resetReqForm" style="gap:10px">
+        <div>
+          <label class="lab" for="rstEmail">Account Email Address</label>
+          <div class="inline">
+            <input type="email" id="rstEmail" value="${esc(resetState.email)}" placeholder="you@example.com" required>
+            <button class="btn sm solid" type="submit">Send Reset Code</button>
+          </div>
+        </div>
+      </form>
+      ${resetState.sent?`
+        <div class="card sun">
+          <p class="small"><b>Recovery Email Prepared for ${esc(resetState.email)}</b></p>
+          <p class="hint small">In this browser-hosted app, your 6-digit recovery token is <b class="mono">${esc(resetState.code)}</b>. You can also dispatch it to your inbox below:</p>
+          <div class="row">
+            <a class="btn sm" href="mailto:${encodeURIComponent(resetState.email)}?subject=${encodeURIComponent('Steady Password Reset Code: '+resetState.code)}&body=${encodeURIComponent('Your Steady OS 6-digit password reset code is: '+resetState.code)}">Open in Apple Mail ↗</a>
+            <a class="btn sm" href="https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(resetState.email)}&su=${encodeURIComponent('Steady Password Reset Code: '+resetState.code)}&body=${encodeURIComponent('Your Steady OS 6-digit password reset code is: '+resetState.code)}" target="_blank" rel="noopener">Send via Gmail ↗</a>
+          </div>
+        </div>
+        <form class="stack" id="resetConfirmForm" style="gap:10px">
+          <div>
+            <label class="lab" for="rstCodeIn">Enter 6-Digit Recovery Code</label>
+            <input type="text" id="rstCodeIn" value="${esc(resetState.code)}" placeholder="6-digit code" required>
+          </div>
+          <div>
+            <label class="lab" for="rstNewPass">New Password</label>
+            <input type="password" id="rstNewPass" placeholder="Enter new password" required>
+          </div>
+          <button class="btn solid" type="submit">Verify Code &amp; Update Password</button>
+        </form>
+      `:''}
+      <div class="sec">
+        <button class="btn sm link" type="button" id="backLoginBtn">← Back to Sign In</button>
+      </div>`;
+  }
+
+  root.innerHTML=`
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div class="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="13" r="8" fill="var(--sun)"/><rect x="3" y="21" width="26" height="3.5" rx="1.75" fill="var(--accent)"/><rect x="8" y="26.5" width="16" height="2.5" rx="1.25" fill="var(--accent)" opacity=".55"/></svg>
+          <div><b>Steady</b><small>Chief of Staff &amp; Life OS</small></div>
+        </div>
+        ${formHtml}
+      </div>
+    </div>`;
+
+  const goSignup=$('#goSignupBtn');
+  if(goSignup)goSignup.onclick=()=>{authMode='signup';renderAuthScreen();};
+  const goReset=$('#goResetBtn');
+  if(goReset)goReset.onclick=()=>{
+    const emEl=$('#authEmail');
+    if(emEl&&emEl.value)resetState.email=emEl.value.trim().toLowerCase();
+    authMode='reset';renderAuthScreen();
+  };
+  const backLogin=$('#backLoginBtn');
+  if(backLogin)backLogin.onclick=()=>{authMode='login';resetState.sent=false;renderAuthScreen();};
+
+  root.querySelectorAll('[data-quick-email]').forEach(btn=>{
+    btn.onclick=()=>{
+      const em=btn.dataset.quickEmail;
+      const acc=loadAccounts()[em];
+      if(!acc)return;
+      if(acc.isFounder){
+        loginUser(acc,false);
+        toast('Signed in to Matt’s Palm Springs Founder Account.');
+      } else {
+        const emIn=$('#authEmail'),pIn=$('#authPass');
+        if(emIn)emIn.value=em;
+        if(pIn)pIn.focus();
+        toast('Enter password for '+em+' (or click Forgot password).');
+      }
+    };
+  });
+
+  const loginForm=$('#loginForm');
+  if(loginForm)loginForm.onsubmit=e=>{
+    e.preventDefault();
+    const em=$('#authEmail').value.trim().toLowerCase();
+    const pw=$('#authPass').value;
+    const accs=loadAccounts();
+    const acc=accs[em];
+    if(!acc){toast('No account found for '+em+'. Click "Create New Account" below.');return;}
+    if(acc.passHash!==simpleHash(pw)&&!(acc.isFounder&&pw==='steady')){
+      toast('Incorrect password. Try again or click "Forgot password?".');
+      return;
+    }
+    loginUser(acc,false);
+    toast('Welcome back, '+acc.name+'!');
+  };
+
+  const signupForm=$('#signupForm');
+  if(signupForm)signupForm.onsubmit=e=>{
+    e.preventDefault();
+    const nm=$('#regName').value.trim();
+    const em=$('#regEmail').value.trim().toLowerCase();
+    const pw=$('#regPass').value;
+    if(pw.length<4){toast('Please choose a password with at least 4 characters.');return;}
+    const accs=loadAccounts();
+    if(accs[em]){toast('An account with '+em+' already exists. Please sign in.');authMode='login';renderAuthScreen();return;}
+    const newUser={email:em,name:nm||em.split('@')[0],passHash:simpleHash(pw),isFounder:false,createdAt:Date.now()};
+    accs[em]=newUser;
+    saveAccounts(accs);
+    const fresh=freshUserDefaults(em,newUser.name);
+    localStorage.setItem('steady.user.'+em,JSON.stringify(fresh));
+    loginUser(newUser,true);
+    toast('Account created! Complete the 6 modules to personalize your Steady OS.');
+  };
+
+  const resetReqForm=$('#resetReqForm');
+  if(resetReqForm)resetReqForm.onsubmit=e=>{
+    e.preventDefault();
+    const em=$('#rstEmail').value.trim().toLowerCase();
+    const accs=loadAccounts();
+    if(!accs[em]){toast('No account registered under '+em+'.');return;}
+    resetState.email=em;
+    resetState.code=String(Math.floor(100000+Math.random()*900000));
+    resetState.sent=true;
+    renderAuthScreen();
+    toast('Recovery code generated for '+em+'.');
+  };
+
+  const resetConfirmForm=$('#resetConfirmForm');
+  if(resetConfirmForm)resetConfirmForm.onsubmit=e=>{
+    e.preventDefault();
+    const code=$('#rstCodeIn').value.trim();
+    const newPw=$('#rstNewPass').value;
+    if(code!==resetState.code){toast('Invalid 6-digit recovery code.');return;}
+    if(newPw.length<4){toast('New password must be at least 4 characters.');return;}
+    const accs=loadAccounts();
+    const acc=accs[resetState.email];
+    if(!acc)return;
+    acc.passHash=simpleHash(newPw);
+    saveAccounts(accs);
+    resetState={email:'',code:'',sent:false};
+    loginUser(acc,false);
+    toast('Password updated! You are now signed in.');
+  };
+}
+
 /* ---------- Views ---------- */
 let VIEW='today';
 
 function viewToday(){
   const k=dkey(),ck=state.checks[k]||{},doneN=SLOTS.filter(s=>ck[s.id]).length,pct=Math.round(doneN/SLOTS.length*100);
   const n=slotNow(),cur=n.cur,b=getBig3(k),mDone=(state.morningDone[k]||{}).done;
+  const prof=state.profile||{},pTarget=prof.proteinTarget||180,wTarget=prof.waterTarget||10;
   const prot=state.protein[k]||0,wat=state.water[k]||0,soc=state.social[k]||0;
   const lastMsg=state.messages.slice().reverse().find(m=>m.from!=='you');
   const ds=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  const guideBanner=prof.showGuide?`
+    <div class="card" style="margin-bottom:18px;border-color:var(--accent)">
+      <div class="hd">
+        <div>
+          <p class="eyebrow">App Guidance · Getting Started with Steady</p>
+          <h2>Welcome to your personal Chief of Staff${prof.name?', '+esc(prof.name):''}</h2>
+        </div>
+        <div class="row">
+          <button class="btn sm solid" data-act="open-wizard">Customize Modules (1–6)</button>
+          <button class="btn sm" data-act="dismiss-guide">Got It ✓</button>
+        </div>
+      </div>
+      <div class="grid-3" style="gap:10px">
+        <div class="card soft" style="padding:10px"><b>1. Morning Ignition</b><p class="hint small">Tap "Morning Ignition" every morning for your reaffirmation, 60s breathing, reflection &amp; #1 priority.</p></div>
+        <div class="card soft" style="padding:10px"><b>2. Link Your Apps</b><p class="hint small">Tap any integration button or visit <b>Integrations</b> to connect Google Calendar, Sheets, Docs, Gmail, iMessage &amp; WhatsApp.</p></div>
+        <div class="card soft" style="padding:10px"><b>3. Edit Preferences</b><p class="hint small">Visit <b>Preferences</b> anytime to update your favorite dishes, workouts, ventures, or sports.</p></div>
+      </div>
+    </div>`:'';
 
   const morningGateBanner=!mDone?`
     <div class="card sun" style="margin-bottom:18px">
@@ -40,13 +317,13 @@ function viewToday(){
     <section class="card">
       <div class="hd"><h3>Today’s Big 3 Outcomes</h3><span class="tag">Anchor + Launch</span></div>
       <ul class="big3">
-        ${b.map((x,i)=>`<li class="${x.done?'done':''}"><label class="chk"><input type="checkbox" data-field="big3d" data-i="${i}" ${x.done?'checked':''}></label><input type="text" data-field="big3" data-i="${i}" value="${esc(x.t)}" placeholder="${i===0?'#1 Revenue / Venture / Reseller move':'Outcome #'+(i+1)}"></li>`).join('')}
+        ${b.map((x,i)=>`<li class="${x.done?'done':''}"><label class="chk"><input type="checkbox" data-field="big3d" data-i="${i}" ${x.done?'checked':''}></label><input type="text" data-field="big3" data-i="${i}" value="${esc(x.t)}" placeholder="${i===0?'#1 Revenue / Venture / Career move':'Outcome #'+(i+1)}"></li>`).join('')}
       </ul>
     </section>`;
 
   const focusAndParking=`
     <section class="card">
-      <div class="hd"><h3>Focus Timer &amp; ADHD Parking Lot</h3><span class="tag">Shield</span></div>
+      <div class="hd"><h3>Focus Timer &amp; Distraction Parking Lot</h3><span class="tag">Shield</span></div>
       ${focus?`
         <div class="clock" id="clock">${fmtClock(focus.end-Date.now())}</div>
         <p class="hint">Single-task mode. Do not switch tabs—park stray thoughts below.</p>
@@ -71,13 +348,13 @@ function viewToday(){
       <div class="hd"><h3>Daily Discipline Pulse</h3><button class="btn sm link" data-act="open-morning">${mDone?'Morning Ritual ✓':'Morning Ritual'}</button></div>
       <div class="grid-3" style="gap:12px">
         <div class="card soft" style="padding:12px">
-          <span class="lab">Protein (Goal 180g)</span>
+          <span class="lab">Protein (Goal ${pTarget}g)</span>
           <p class="stat">${prot}g</p>
           <div class="row"><button class="btn sm" data-act="prot" data-n="30">+30g</button><button class="btn sm" data-act="prot" data-n="50">+50g</button></div>
         </div>
         <div class="card soft" style="padding:12px">
           <span class="lab">Hydration (Glasses)</span>
-          <p class="stat">${wat} <small>/ 10</small></p>
+          <p class="stat">${wat} <small>/ ${wTarget}</small></p>
           <div class="row"><button class="btn sm" data-act="water" data-n="1">+1 Glass</button><button class="btn sm" data-act="water" data-n="-1">−1</button></div>
         </div>
         <div class="card soft" style="padding:12px">
@@ -106,7 +383,7 @@ function viewToday(){
   const timelineCard=`
     <section class="card">
       <div class="hd">
-        <h3>Palm Springs Wake-to-Bed Schedule (${doneN}/${SLOTS.length})</h3>
+        <h3>Wake-to-Bed Schedule (${doneN}/${SLOTS.length})</h3>
         <div class="row">
           <button class="btn sm link" data-act="shift" data-n="-15">−15m</button>
           <button class="btn sm link" data-act="shift" data-n="15">+15m</button>
@@ -146,21 +423,22 @@ function viewToday(){
   return `
     <header class="page-head">
       <div>
-        <p class="eyebrow">${esc(ds)} · Palm Springs, CA</p>
-        <h1>Steady Command Center</h1>
+        <p class="eyebrow">${esc(ds)}${prof.city?' · '+esc(prof.city):''} · ${esc(prof.programPack||'Steady OS')}</p>
+        <h1>${esc(prof.name?prof.name+'’s ':'')}Steady Command Center</h1>
       </div>
       <div class="row">
         <button class="btn sun" data-act="open-morning">Morning Ignition</button>
-        <button class="btn" data-act="enable-notif">Enable Alerts</button>
-        <button class="btn" data-act="export-ics">Add to iPhone/Mac Calendar</button>
+        <button class="btn" data-act="open-wizard">Personalize</button>
+        <button class="btn" data-act="export-ics">Add to Calendar</button>
       </div>
     </header>
+    ${guideBanner}
     ${morningGateBanner}
     ${domainIntegrationsBar('anchor',[
       {svc:'gcalendar',op:'WRITE',key:'gcal_push_now',label:'Google Calendar: Push Current Block'},
       {svc:'gcalendar',op:'MODIFY',key:'gcal_modify_shift',label:'Google Calendar: Sync Shifted Schedule'},
       {svc:'gdocs',op:'WRITE',key:'gdocs_reflection',label:'Google Docs: Append Morning Reflection'},
-      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Wife & Dinner Check-In'}
+      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Partner & Dinner Check-In'}
     ])}
     <div class="grid-2">
       <div class="stack">${nowCard}${big3Card}${pulseMetrics}${timelineCard}</div>
@@ -170,7 +448,7 @@ function viewToday(){
 
 function viewChief(){
   const chips=Object.keys(QUICK).map(k=>`<button class="chip" data-act="quick" data-q="${k}">${esc(QUICK[k].label)}</button>`).join('');
-  const msgs=state.messages;
+  const msgs=state.messages,prof=state.profile||{};
   return `
     <header class="page-head">
       <div><p class="eyebrow">Chief of Staff · Central Orchestrator</p><h1>Command &amp; Daily Briefings</h1></div>
@@ -178,7 +456,7 @@ function viewChief(){
     </header>
     <div class="chips">${chips}</div>
     <div class="thread" id="thread">
-      ${!msgs.length?`<div class="msg bot"><p class="meta">Chief · Ready</p><p class="body">I am your Chief of Staff. I manage 8 specialist agents tailored to your life in Palm Springs:\n• Anchor (Structure & Shield) · Spark (Morning Mindset) · Body (Workouts & High-Protein Meals)\n• Ticker (Morning Stock Trades) · Scout (Deals & Reseller Flips) · Wrench (Home & Auto DIY)\n• Launch (Google BD & Ventures) · Circle (Latvian Wife, 12yo Son, 7yo Daughter & Sports)\n\nTap a command chip above or tell me what’s on your mind.</p></div>`:''}
+      ${!msgs.length?`<div class="msg bot"><p class="meta">Chief · Ready</p><p class="body">Hello ${esc(prof.name||'friend')}. I am your Chief of Staff (${esc(prof.programPack||'Steady OS')}). I coordinate your 8 specialist agents:\n• Anchor (Structure & Shield) · Spark (Morning Mindset) · Body (Workouts & ${prof.proteinTarget||180}g Protein Meals)\n• Ticker (Morning Stock Trades) · Scout (Deals & Reseller Flips) · Wrench (Home & Auto DIY)\n• Launch (Ventures & Outreach) · Circle (Family & ${(prof.favoriteSports||[]).slice(0,3).join(', ')||'Sports'})\n\nTap a command chip above or tell me what’s on your mind.</p></div>`:''}
       ${msgs.map(m=>{
         const you=m.from==='you',who=you?'You':'Chief of Staff';
         return `<div class="msg ${you?'you':'bot'}"><p class="meta">${esc(who)} · ${esc(clockOf(m.ts))}</p><div class="body">${esc(m.t)}</div>${m.tasks&&m.tasks.length?`<div class="issued"><b>Tasks Issued:</b> ${m.tasks.map(t=>`<span class="tag">${esc(AG[t.agent].name)}</span> ${esc(t.title)}`).join(' · ')}</div>`:''}</div>`;
@@ -195,18 +473,22 @@ function viewChief(){
 }
 
 function viewBody(){
-  const k=dkey(),prot=state.protein[k]||0,wDone=state.workoutDone[k]||{};
+  const k=dkey(),prof=state.profile||{},pTarget=prof.proteinTarget||180;
+  const prot=state.protein[k]||0,wDone=state.workoutDone[k]||{};
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const recs=activeRecipes();
   const shopMap={'Meat & Seafood':[],'Dairy & Eggs':[],'Produce':[],'Pantry':[]};
   const seen={};
   days.forEach(d=>{
-    const r=RECIPES.find(x=>x.id===state.mealPlan[d])||RECIPES[0];
-    r.ingredients.forEach(ing=>{
-      if(!seen[ing.item]){
-        seen[ing.item]=true;
-        (shopMap[ing.cat]=shopMap[ing.cat]||[]).push(ing.item);
-      }
-    });
+    const r=recs.find(x=>x.id===state.mealPlan[d])||RECIPES.find(x=>x.id===state.mealPlan[d])||recs[0];
+    if(r&&r.ingredients){
+      r.ingredients.forEach(ing=>{
+        if(!seen[ing.item]){
+          seen[ing.item]=true;
+          (shopMap[ing.cat]=shopMap[ing.cat]||[]).push(ing.item);
+        }
+      });
+    }
   });
   state.customGroceries.forEach(g=>{
     if(!seen[g]){seen[g]=true;shopMap['Pantry'].push(g);}
@@ -214,21 +496,25 @@ function viewBody(){
 
   return `
     <header class="page-head">
-      <div><p class="eyebrow">Body Agent · Fitness, Nutrition &amp; Grocery Ops</p><h1>Workouts, High-Protein Meals &amp; Shopping List</h1></div>
+      <div>
+        <p class="eyebrow">Body Agent · ${esc(prof.workoutStyle||'Fitness')} &amp; ${esc(prof.dietStyle||'High-Protein Nutrition')}</p>
+        <h1>Workouts, High-Protein Meals &amp; Shopping List</h1>
+      </div>
       <div class="row">
-        <span class="tag good">Today’s Protein: ${prot}g / 180g</span>
+        <span class="tag good">Today’s Protein: ${prot}g / ${pTarget}g</span>
         <button class="btn sm solid" data-act="prot" data-n="40">+40g Protein Shake/Meal</button>
+        <a class="btn sm" href="#prefs">Edit Favorite Dishes</a>
       </div>
     </header>
     ${domainIntegrationsBar('body',[
       {svc:'gsheets',op:'WRITE',key:'gsheets_grocery',label:'Google Sheets: Sync Weekly Grocery List'},
       {svc:'youtube_ios',op:'WRITE',key:'ios_reminders_push',label:'Apple Reminders: Push Grocery Checklist'},
-      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Text Wife Tonight’s Recipe'}
+      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Text Partner Tonight’s Recipe'}
     ])}
     <div class="grid-2">
       <div class="stack">
         <section class="card">
-          <div class="hd"><h3>Forced Daily Workouts &amp; Wellbeing Resets</h3><span class="tag">Body</span></div>
+          <div class="hd"><h3>Forced Daily Workouts &amp; Wellbeing Resets</h3><span class="tag">${esc(prof.workoutStyle||'Body')}</span></div>
           ${WORKOUTS.map(w=>`
             <div class="card soft">
               <div class="hd">
@@ -241,17 +527,17 @@ function viewBody(){
         </section>
 
         <section class="card">
-          <div class="hd"><h3>Weekly High-Protein Meal Plan</h3><span class="hint small">Select dinner/anchor meal per day</span></div>
+          <div class="hd"><h3>Weekly High-Protein Meal Plan</h3><span class="hint small">Populated from your Favorite Dishes</span></div>
           <table class="tbl">
             <thead><tr><th>Day</th><th>Selected High-Protein Recipe</th><th>Protein</th></tr></thead>
             <tbody>
               ${days.map(d=>{
-                const curR=RECIPES.find(r=>r.id===state.mealPlan[d])||RECIPES[0];
+                const curR=recs.find(r=>r.id===state.mealPlan[d])||RECIPES.find(r=>r.id===state.mealPlan[d])||recs[0];
                 return `<tr>
                   <td><b>${d}</b></td>
                   <td>
                     <select data-field="meal-day" data-day="${d}">
-                      ${RECIPES.map(r=>`<option value="${r.id}" ${r.id===curR.id?'selected':''}>${esc(r.name)} (${r.protein}g)</option>`).join('')}
+                      ${recs.map(r=>`<option value="${r.id}" ${r.id===curR.id?'selected':''}>${esc(r.name)} (${r.protein}g)</option>`).join('')}
                     </select>
                   </td>
                   <td class="mono"><b>${curR.protein}g</b></td>
@@ -262,12 +548,12 @@ function viewBody(){
         </section>
 
         <section class="card">
-          <h3>Protein-Focused Recipes (${RECIPES.length})</h3>
-          ${RECIPES.map(r=>`
+          <div class="hd"><h3>Your Active High-Protein Recipes (${recs.length})</h3><a class="btn sm link" href="#prefs">+ Add/Manage Favorites</a></div>
+          ${recs.map(r=>`
             <details class="sec" style="padding-top:10px">
-              <summary style="cursor:pointer;font-weight:600">${esc(r.name)} — <span class="tag good">${r.protein}g protein</span> <span class="hint small">(${r.cals} kcal · ${r.prep})</span></summary>
-              <p class="hint" style="margin:8px 0">${esc(r.steps)}</p>
-              <p class="small"><b>Ingredients:</b> ${r.ingredients.map(i=>esc(i.item)).join(' · ')}</p>
+              <summary style="cursor:pointer;font-weight:600">${esc(r.name)} — <span class="tag good">${r.protein}g protein</span> <span class="hint small">(${r.cals||550} kcal · ${r.prep||'15 min'})</span></summary>
+              <p class="hint" style="margin:8px 0">${esc(r.steps||'')}</p>
+              <p class="small"><b>Ingredients:</b> ${(r.ingredients||[]).map(i=>esc(i.item)).join(' · ')}</p>
             </details>
           `).join('')}
         </section>
@@ -312,7 +598,7 @@ function viewMarkets(){
 
   return `
     <header class="page-head">
-      <div><p class="eyebrow">Ticker Agent · West Coast Morning Trading Desk (6:30–8:00 AM PT)</p><h1>Stock Market Insights &amp; Trade Discipline</h1></div>
+      <div><p class="eyebrow">Ticker Agent · Morning Trading Desk (Hard Stop: ${esc(rules.stopTime)} AM)</p><h1>Stock Market Insights &amp; Trade Discipline</h1></div>
       <div class="row">
         <span class="tag ${todayPnl>=0?'good':'crit'}">Today P&amp;L: $${todayPnl}</span>
         <span class="tag">Total Logged: $${totalPnl}</span>
@@ -320,16 +606,16 @@ function viewMarkets(){
     </header>
     ${domainIntegrationsBar('ticker',[
       {svc:'gsheets',op:'WRITE',key:'gsheets_trades',label:'Google Sheets: Sync Morning Trade Journal & P&L'},
-      {svc:'gcalendar',op:'WRITE',key:'gcal_push_now',label:'Google Calendar: Lock 6:30–8:00 AM PT Market Window'}
+      {svc:'gcalendar',op:'WRITE',key:'gcal_push_now',label:'Google Calendar: Lock Morning Market Window'}
     ])}
     <div class="grid-2">
       <div class="stack">
         <section class="card sun">
-          <div class="hd"><h3>ADHD Pre-Trade Impulse Gate</h3><span class="tag sun">Hard Stop: ${esc(rules.stopTime)} AM PT</span></div>
+          <div class="hd"><h3>Pre-Trade Impulse Gate</h3><span class="tag sun">Hard Stop: ${esc(rules.stopTime)} AM</span></div>
           <p class="hint">Check all 3 boxes before entering any morning trade so you trade setups—not dopamine:</p>
           <label class="row" style="cursor:pointer"><input type="checkbox" data-field="tr-chk" data-i="0" ${rules.checklist[0]?'checked':''}> <span><b>1. Setup &amp; Catalyst:</b> Clear support/resistance level + volume (not chasing green candles).</span></label>
           <label class="row" style="cursor:pointer"><input type="checkbox" data-field="tr-chk" data-i="1" ${rules.checklist[1]?'checked':''}> <span><b>2. Defined Risk:</b> Hard stop-loss is set inside my $${rules.maxLoss} daily max loss limit.</span></label>
-          <label class="row" style="cursor:pointer"><input type="checkbox" data-field="tr-chk" data-i="2" ${rules.checklist[2]?'checked':''}> <span><b>3. Time Window:</b> It is before ${esc(rules.stopTime)} AM PT and I have taken fewer than ${rules.maxTrades} trades today (${todayTrades.length}/${rules.maxTrades} used).</span></label>
+          <label class="row" style="cursor:pointer"><input type="checkbox" data-field="tr-chk" data-i="2" ${rules.checklist[2]?'checked':''}> <span><b>3. Time Window:</b> It is before ${esc(rules.stopTime)} AM and I have taken fewer than ${rules.maxTrades} trades today (${todayTrades.length}/${rules.maxTrades} used).</span></label>
           <p class="small"><b>Status:</b> ${allChecked?'<span class="tag good">Cleared to Execute A+ Setup</span>':'<span class="tag crit">DO NOT TRADE YET — Complete Checklist</span>'}</p>
         </section>
 
@@ -385,9 +671,10 @@ function viewMarkets(){
 
 function viewDeals(){
   const totalProfit=state.flips.reduce((a,f)=>a+((+f.sell||0)-(+f.buy||0)-(+f.fees||0)),0);
+  const city=(state.profile&&state.profile.city)||'Local';
   return `
     <header class="page-head">
-      <div><p class="eyebrow">Scout Agent · Reseller License, Arbitrage &amp; Deal Hunter</p><h1>Marketplaces, Liquidators &amp; Flip Tracker</h1></div>
+      <div><p class="eyebrow">Scout Agent · Deal Hunter, Arbitrage &amp; Reseller Engine</p><h1>Marketplaces, Liquidators &amp; Flip Tracker</h1></div>
       <div class="row">
         <span class="tag good">Pipeline Net Profit: $${totalProfit}</span>
         <button class="btn sm solid" data-act="focus-start" data-min="30">Start 30m Deal-Hunt Timer</button>
@@ -402,9 +689,9 @@ function viewDeals(){
     <div class="grid-2">
       <div class="stack">
         <section class="card">
-          <div class="hd"><h3>Target Deal Watchlist &amp; 1-Click Marketplace Launchers</h3><span class="tag">Palm Springs + Online</span></div>
+          <div class="hd"><h3>Target Deal Watchlist &amp; 1-Click Marketplace Launchers</h3><span class="tag">${esc(city)} + Online</span></div>
           <p class="hint small">Click any marketplace below a target item to search live listings immediately without mindless browsing.</p>
-          <ul class="list">
+          ${state.hunts.length?`<ul class="list">
             ${state.hunts.map(h=>{
               const q=encodeURIComponent(h.item);
               const estMargin=h.estSell>0?(h.estSell-h.maxBuy):0;
@@ -422,9 +709,9 @@ function viewDeals(){
                 </div>
               </li>`;
             }).join('')}
-          </ul>
+          </ul>`:'<p class="hint small">Add your first product to hunt below.</p>'}
           <form class="grid-3" data-form="hunt" style="gap:8px;margin-top:8px">
-            <input type="text" name="item" placeholder="Product to hunt (e.g. Peloton, Golf Cart, Dyson)" required>
+            <input type="text" name="item" placeholder="Product to hunt (e.g. Espresso Machine, Golf Cart)" required>
             <input type="number" name="maxBuy" placeholder="Max buy price ($)" required>
             <div class="inline"><input type="number" name="estSell" placeholder="Est resale $ (0 if personal)"><button class="btn sm solid" type="submit">Add Target</button></div>
           </form>
@@ -485,9 +772,8 @@ function viewDiy(){
     ])}
     <div class="grid-2">
       <div class="stack">
-        ${state.projects.map(p=>{
-          const doneC=p.steps.filter(s=>s.done).length;
-          return `<section class="card">
+        ${state.projects.length?state.projects.map(p=>`
+          <section class="card">
             <div class="hd">
               <div><span class="tag">${esc(p.cat)}</span> <span class="tag good">Saves ~$${p.estSave}</span><h2 style="margin-top:6px">${esc(p.title)}</h2></div>
               <a class="btn sm solid" href="https://www.youtube.com/results?search_query=${encodeURIComponent(p.ytQuery||p.title)}" target="_blank" rel="noopener">Watch YouTube Guide ↗</a>
@@ -505,8 +791,7 @@ function viewDiy(){
               <input type="text" placeholder="Add next repair/maintenance step…" autocomplete="off">
               <button class="btn sm" type="submit">Add Step</button>
             </form>
-          </section>`;
-        }).join('')}
+          </section>`).join(''):'<section class="card"><p class="hint">No DIY projects yet. Create your first home or car maintenance guide on the right.</p></section>'}
       </div>
       <div class="stack">
         <section class="card">
@@ -515,7 +800,7 @@ function viewDiy(){
           <form class="stack" data-form="diy-new" style="gap:10px">
             <div><label class="lab">Project Title</label><input type="text" name="title" placeholder="e.g., Replace Kitchen Disposal or Brake Pads" required></div>
             <div class="grid-2 equal" style="gap:10px">
-              <div><label class="lab">Category</label><select name="cat"><option>Home Maintenance</option><option>Auto Maintenance</option><option>Desert Yard / Pool</option><option>Garage / Build</option></select></div>
+              <div><label class="lab">Category</label><select name="cat"><option>Home Maintenance</option><option>Auto Maintenance</option><option>Yard / Pool</option><option>Garage / Build</option></select></div>
               <div><label class="lab">Est. Savings vs. Pro ($)</label><input type="number" name="save" placeholder="200" required></div>
             </div>
             <div><label class="lab">Tools &amp; Parts Required</label><input type="text" name="parts" placeholder="List sockets, replacement parts, sealant…" required></div>
@@ -530,17 +815,18 @@ function viewDiy(){
 function viewLaunch(){
   const w=week(),g=+state.bridge.goal||0,e=+state.bridge.earned||0,pct=g?Math.min(100,Math.round(e/g*100)):0;
   const stages=['Idea','Validate','Offer','Launch','Revenue'];
+  const prof=state.profile||{};
   return `
     <header class="page-head">
-      <div><p class="eyebrow">Launch Agent · Business Execution &amp; Google BD Advantage</p><h1>Ventures, Partnerships &amp; Income Scoreboard</h1></div>
+      <div><p class="eyebrow">Launch Agent · Business Execution${prof.careerBackground?' ('+esc(prof.careerBackground)+')':''}</p><h1>Ventures, Partnerships &amp; Income Scoreboard</h1></div>
     </header>
     ${domainIntegrationsBar('launch',[
-      {svc:'gmail',op:'WRITE',key:'gmail_bd_outreach',label:'Gmail: Draft Warm Ex-Google BD Outreach Email'},
+      {svc:'gmail',op:'WRITE',key:'gmail_bd_outreach',label:'Gmail: Draft Warm Partnership / BD Outreach Email'},
       {svc:'gdocs',op:'WRITE',key:'gdocs_venture_pitch',label:'Google Docs: Draft Venture Partnership 1-Pager'},
       {svc:'whatsapp',op:'WRITE',key:'whatsapp_bd',label:'WhatsApp: Message Partner / Founder Contact'}
     ])}
     <div class="card sun" style="margin-bottom:20px">
-      <b>The ADHD Founder Rule: One Active Venture at a Time.</b> Your Google Business Development, Sales &amp; Partnerships background works best when focused on a single offer until it generates revenue.
+      <b>The Founder Focus Rule: One Active Venture at a Time.</b> Park secondary business ideas below so you can drive your active venture all the way to revenue.
     </div>
     <div class="grid-2">
       <div class="stack">
@@ -574,7 +860,7 @@ function viewLaunch(){
           <h3>Weekly Execution Scoreboard</h3>
           <div class="grid-3" style="gap:12px">
             <div class="card soft">
-              <span class="lab">BD / Partner Convos</span>
+              <span class="lab">Partner / Lead Convos</span>
               <p class="stat">${w.convos||0} <small>/ ${state.targets.convos}</small></p>
               <div class="row"><button class="btn sm" data-act="wk" data-k="convos" data-n="1">+1</button><button class="btn sm" data-act="wk" data-k="convos" data-n="-1">−1</button></div>
             </div>
@@ -584,8 +870,8 @@ function viewLaunch(){
               <div class="row"><button class="btn sm" data-act="wk" data-k="shipped" data-n="1">+1</button><button class="btn sm" data-act="wk" data-k="shipped" data-n="-1">−1</button></div>
             </div>
             <div class="card soft">
-              <span class="lab">Reseller Flips Listed</span>
-              <p class="stat">${w.flipsListed||0} <small>/ 5</small></p>
+              <span class="lab">Deals / Flips Listed</span>
+              <p class="stat">${w.flipsListed||0} <small>/ ${state.targets.flipsListed||5}</small></p>
               <div class="row"><button class="btn sm" data-act="wk" data-k="flipsListed" data-n="1">+1</button><button class="btn sm" data-act="wk" data-k="flipsListed" data-n="-1">−1</button></div>
             </div>
           </div>
@@ -605,23 +891,25 @@ function viewLaunch(){
 }
 
 function viewFamily(){
+  const prof=state.profile||{},ideas=activeFamilyIdeas();
+  const famHeader=[prof.spouseName,prof.kidsDesc].filter(Boolean).join(' · ')||'Family & Friends';
   return `
     <header class="page-head">
-      <div><p class="eyebrow">Circle Agent · Wife (Latvia), Son (12), Daughter (7) &amp; Sports</p><h1>Family Bonding &amp; Palm Springs Sports Planner</h1></div>
+      <div><p class="eyebrow">Circle Agent · ${esc(famHeader)}</p><h1>Family Bonding &amp; Favorite Sports Planner</h1></div>
+      <a class="btn sm" href="#prefs">Edit Favorite Sports</a>
     </header>
     ${domainIntegrationsBar('circle',[
-      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Text Wife Dinner & Kids Plan'},
-      {svc:'imessage',op:'WRITE',key:'imessage_sports',label:'Apple Messages: Invite Friend/Son to Golf or Pickleball'},
-      {svc:'whatsapp',op:'WRITE',key:'whatsapp_family',label:'WhatsApp: Update Wife & Family in Latvia'},
-      {svc:'gcalendar',op:'WRITE',key:'gcal_family_sport',label:'Google Calendar: Lock 4:00 PM Family Sports Block'}
+      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Text Partner Dinner & Family Plan'},
+      {svc:'imessage',op:'WRITE',key:'imessage_sports',label:'Apple Messages: Send Sports Invite'},
+      {svc:'whatsapp',op:'WRITE',key:'whatsapp_family',label:'WhatsApp: Send Family Update'},
+      {svc:'gcalendar',op:'WRITE',key:'gcal_family_sport',label:'Google Calendar: Lock 4:00 PM Family Block'}
     ])}
     <div class="grid-2">
       <div class="stack">
         <section class="card">
-          <h3>Ready-to-Play Family &amp; Sports Activities</h3>
-          <p class="hint small">Tailored to golf, pickleball, tennis, football, bowling, basketball, and family evenings.</p>
+          <div class="hd"><h3>Tailored Family &amp; Sports Activities</h3><span class="hint small">${esc((prof.favoriteSports||[]).join(', '))}</span></div>
           <ul class="list">
-            ${FAMILY_IDEAS.map(f=>`
+            ${ideas.map(f=>`
               <li>
                 <div>
                   <span class="tag">${esc(f.sport)}</span> <span class="tag sun">${esc(f.who)}</span> · <span class="mono small">${esc(f.time)}</span>
@@ -639,8 +927,8 @@ function viewFamily(){
           <h3>Family Connection &amp; Sports Memory Log</h3>
           <form class="stack" data-form="family-log" style="gap:8px">
             <div class="grid-2 equal" style="gap:8px">
-              <input type="text" name="who" placeholder="Who (e.g. Wife, Son 12, Daughter 7)" required>
-              <input type="text" name="activity" placeholder="Sport or activity (e.g. Pickleball, Latvian dinner)" required>
+              <input type="text" name="who" placeholder="Who (e.g. Partner, Kids, Friends)" required>
+              <input type="text" name="activity" placeholder="Sport or activity (e.g. Pickleball, Golf, Dinner)" required>
             </div>
             <div class="inline"><input type="text" name="note" placeholder="Highlight or memory from today…" required><button class="btn sm solid" type="submit">Save</button></div>
           </form>
@@ -729,6 +1017,122 @@ function viewConnect(){
     </div>`;
 }
 
+function viewPrefs(){
+  const p=state.profile||{};
+  const allRecs=RECIPES.concat(p.customDishes||[]);
+  return `
+    <header class="page-head">
+      <div>
+        <p class="eyebrow">Personalization &amp; Account Settings · ${esc(currentUser?currentUser.email:'')}</p>
+        <h1>Preferences &amp; Custom Modules</h1>
+      </div>
+      <div class="row">
+        <button class="btn sun" data-act="open-wizard">Launch 6-Module Setup Wizard</button>
+        <button class="btn" data-act="export-json">Export My Private Data</button>
+      </div>
+    </header>
+    <div class="grid-2">
+      <div class="stack">
+        <section class="card">
+          <h3>Module 1 · Demographics, Location &amp; Daily Rhythm</h3>
+          <div class="grid-2 equal" style="gap:10px">
+            <div><label class="lab">Display Name</label><input type="text" data-field="prof" data-k="name" value="${esc(p.name||'')}"></div>
+            <div><label class="lab">City / Location</label><input type="text" data-field="prof" data-k="city" value="${esc(p.city||'')}"></div>
+          </div>
+          <div class="grid-2 equal" style="gap:10px">
+            <div><label class="lab">Age</label><input type="number" data-field="prof" data-k="age" value="${esc(p.age||'')}"></div>
+            <div><label class="lab">Gender</label><input type="text" data-field="prof" data-k="gender" value="${esc(p.gender||'')}"></div>
+          </div>
+          <div class="grid-2 equal" style="gap:10px">
+            <div><label class="lab">Wake Time</label><input type="time" data-field="prof" data-k="wakeTime" value="${esc(p.wakeTime||'06:00')}"></div>
+            <div><label class="lab">Bedtime</label><input type="time" data-field="prof" data-k="bedTime" value="${esc(p.bedTime||'22:00')}"></div>
+          </div>
+          <div>
+            <label class="lab">Active Mental Health &amp; Life-Ops Program Pack</label>
+            <select data-field="prof" data-k="programPack">
+              ${PROGRAM_PACKS.map(pk=>`<option value="${esc(pk.id)}" ${p.programPack===pk.id?'selected':''}>${esc(pk.id)}</option>`).join('')}
+            </select>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Module 2 &amp; 3 · Exercise, Nutrition &amp; Favorite Dishes</h3>
+          <div class="grid-2 equal" style="gap:10px">
+            <div><label class="lab">Current Weight (lbs)</label><input type="number" data-field="prof" data-k="weightLbs" value="${esc(p.weightLbs||'')}"></div>
+            <div><label class="lab">Goal Weight (lbs)</label><input type="number" data-field="prof" data-k="goalWeightLbs" value="${esc(p.goalWeightLbs||'')}"></div>
+          </div>
+          <div class="grid-2 equal" style="gap:10px">
+            <div><label class="lab">Daily Protein Target (g)</label><input type="number" data-field="prof-num" data-k="proteinTarget" value="${esc(p.proteinTarget||180)}"></div>
+            <div><label class="lab">Daily Water Target (Glasses)</label><input type="number" data-field="prof-num" data-k="waterTarget" value="${esc(p.waterTarget||10)}"></div>
+          </div>
+          <div class="grid-2 equal" style="gap:10px">
+            <div><label class="lab">Workout Style</label><input type="text" data-field="prof" data-k="workoutStyle" value="${esc(p.workoutStyle||'')}"></div>
+            <div><label class="lab">Dietary Approach</label><input type="text" data-field="prof" data-k="dietStyle" value="${esc(p.dietStyle||'')}"></div>
+          </div>
+          <div>
+            <label class="lab">Favorite High-Protein Dishes (Tap to toggle in your Meal Plan)</label>
+            <div class="chips">
+              ${allRecs.map(r=>{
+                const sel=(p.favoriteDishes||[]).indexOf(r.id)>=0;
+                return `<button type="button" class="chip ${sel?'sel':''}" data-act="pref-dish" data-id="${r.id}">${sel?'✓ ':''}${esc(r.name)} (${r.protein}g)</button>`;
+              }).join('')}
+            </div>
+          </div>
+          <form class="card soft" data-form="pref-custom-dish">
+            <span class="lab">Add a New Custom Favorite Dish</span>
+            <div class="grid-2 equal" style="gap:8px">
+              <input type="text" name="name" placeholder="Dish name (e.g., Grilled Salmon &amp; Rice)" required>
+              <input type="number" name="protein" placeholder="Protein (g)" required>
+            </div>
+            <div class="inline">
+              <input type="text" name="ings" placeholder="Ingredients (comma-separated for shopping list)" required>
+              <button class="btn sm solid" type="submit">Add Dish</button>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="card">
+          <h3>Module 4 &amp; 5 · Career, Family &amp; Favorite Activities</h3>
+          <div>
+            <label class="lab">Career Background / Superpower</label>
+            <input type="text" data-field="prof" data-k="careerBackground" value="${esc(p.careerBackground||'')}">
+          </div>
+          <div class="grid-2 equal" style="gap:10px">
+            <div><label class="lab">Partner / Spouse</label><input type="text" data-field="prof" data-k="spouseName" value="${esc(p.spouseName||'')}"></div>
+            <div><label class="lab">Kids / Family Members</label><input type="text" data-field="prof" data-k="kidsDesc" value="${esc(p.kidsDesc||'')}"></div>
+          </div>
+          <div>
+            <label class="lab">Favorite Sports &amp; Bonding Activities (Tap to toggle)</label>
+            <div class="chips">
+              ${ALL_SPORTS.map(sp=>{
+                const sel=(p.favoriteSports||[]).indexOf(sp)>=0;
+                return `<button type="button" class="chip ${sel?'sel':''}" data-act="pref-sport" data-sport="${esc(sp)}">${sel?'✓ ':''}${esc(sp)}</button>`;
+              }).join('')}
+            </div>
+          </div>
+          <div>
+            <label class="lab">Personal Morning Reaffirmation</label>
+            <input type="text" data-field="prof" data-k="affirmation" value="${esc(p.affirmation||'')}">
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Account Security &amp; Session (${esc(currentUser?currentUser.email:'')})</h3>
+          <form class="inline" data-form="change-pass">
+            <input type="password" name="newpass" placeholder="Enter new password to update…" required>
+            <button class="btn sm solid" type="submit">Update Password</button>
+          </form>
+          <div class="row" style="justify-content:space-between;margin-top:8px">
+            <button class="btn sm" type="button" data-act="show-guide">Show App Guidance Banner</button>
+            <button class="btn sm" type="button" data-act="logout">Log Out / Switch User</button>
+          </div>
+        </section>
+      </div>
+    </div>`;
+}
+
 function hubSvg(){
   const cx=190,cy=165,R=118,r=28,open={};
   state.tasks.forEach(t=>{if(!t.done)open[t.agent]=(open[t.agent]||0)+1;});
@@ -745,7 +1149,7 @@ function hubSvg(){
 function viewTeam(){
   return `
     <header class="page-head">
-      <div><p class="eyebrow">Multi-Agent Backbone &amp; Public SaaS Blueprint</p><h1>Chief of Staff + 8 Specialist Agents</h1></div>
+      <div><p class="eyebrow">Multi-Agent Backbone &amp; Public SaaS Architecture</p><h1>Chief of Staff + 8 Specialist Agents</h1></div>
       <div class="row">
         <button class="btn sm" data-act="export-json">Backup Data (.json)</button>
       </div>
@@ -758,13 +1162,10 @@ function viewTeam(){
           <p class="hint small">iOS &amp; Desktop Install Tip: On iPhone Safari, tap <b>Share → Add to Home Screen</b> to run Steady full-screen like a native iOS app.</p>
         </section>
         <section class="card">
-          <h3>Public Launch Blueprint (Helping Others with Mental Health &amp; Life Ops)</h3>
-          <p class="hint">Steady’s Chief-of-Staff + Specialist Agent architecture is modular. When you launch publicly, new users complete a 3-minute intake that swaps the Program Pack:</p>
+          <h3>Multi-User Privacy &amp; Program Packs</h3>
+          <p class="hint">Every user who creates an account gets their own isolated data store, custom 6-module onboarding, and selectable Program Pack:</p>
           <ul class="list">
-            <li><div><b>Pack 1: ADHD Focus, Structure &amp; Entrepreneur Momentum (Live Now)</b><p class="hint small">Morning Ignition Gate, Focus Shield, Impulse Guardrails, High-Protein Meals, Venture Focus.</p></div></li>
-            <li><div><b>Pack 2: Anxiety, Overwhelm &amp; Decision Fatigue</b><p class="hint small">Grounding exercises, cognitive offload parking lot, gentle micro-steps, sleep protection.</p></div></li>
-            <li><div><b>Pack 3: Career Transition &amp; Job-Loss Recovery</b><p class="hint small">Daily identity reaffirmation, structured networking CRM, bridge income &amp; skill blocks.</p></div></li>
-            <li><div><b>Pack 4: Family, Health &amp; Habit Rebuild</b><p class="hint small">Meal/grocery automation, movement streaks, screen-free family rituals.</p></div></li>
+            ${PROGRAM_PACKS.map(pk=>`<li><div><b>${esc(pk.id)}</b><p class="hint small">${esc(pk.desc)}</p></div></li>`).join('')}
           </ul>
         </section>
       </div>
@@ -785,8 +1186,9 @@ function viewTeam(){
 }
 
 function foot(){
+  const prof=state.profile||{};
   return `<footer class="foot">
-    <span><b>Steady OS</b> · Tailored for Palm Springs, CA · Coaching &amp; productivity architecture (not medical or financial advice; in a US crisis call/text 988).</span>
+    <span><b>Steady OS</b> · Private Account: ${esc(currentUser?currentUser.email:'Guest')}${prof.city?' · '+esc(prof.city):''} · Coaching &amp; productivity architecture (not medical or financial advice; in a US crisis call/text 988).</span>
     <span>iOS &amp; Desktop Ready</span>
   </footer>`;
 }
@@ -795,7 +1197,16 @@ function foot(){
 const main=$('#main');
 function isTyping(){const a=document.activeElement;return !!a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.type!=='checkbox';}
 function render(){
-  const fn={today:viewToday,chief:viewChief,body:viewBody,markets:viewMarkets,deals:viewDeals,diy:viewDiy,launch:viewLaunch,family:viewFamily,connect:viewConnect,team:viewTeam}[VIEW]||viewToday;
+  if(!currentUser){
+    $('#appShell').hidden=true;
+    $('#authRoot').hidden=false;
+    renderAuthScreen();
+    return;
+  }
+  $('#authRoot').hidden=true;
+  $('#appShell').hidden=false;
+  updateUserChip();
+  const fn={today:viewToday,chief:viewChief,body:viewBody,markets:viewMarkets,deals:viewDeals,diy:viewDiy,launch:viewLaunch,family:viewFamily,connect:viewConnect,prefs:viewPrefs,team:viewTeam}[VIEW]||viewToday;
   main.innerHTML=fn()+foot();
   const openTasks=state.tasks.filter(t=>!t.done).length;
   const linkedCount=INTEGRATIONS.filter(x=>getConn(x.id).linked).length;
@@ -804,6 +1215,7 @@ function render(){
 }
 function renderIfIdle(force){if(force||!isTyping())render();}
 function route(){
+  if(!currentUser){render();return;}
   const h=location.hash.replace('#','');
   const v=VIEWS.some(x=>x.id===h)?h:'today';
   const changed=v!==VIEW;VIEW=v;render();
@@ -811,12 +1223,18 @@ function route(){
 }
 window.addEventListener('hashchange',route);
 $('#wakeBtn').addEventListener('click',openMorningModal);
+const lBtn=$('#logoutBtn');
+if(lBtn)lBtn.addEventListener('click',logoutUser);
 
 /* ---------- Interactive Events ---------- */
 function act(a,el){
   const d=el.dataset,k=dkey();
   switch(a){
+    case 'logout':logoutUser();break;
     case 'open-morning':openMorningModal();break;
+    case 'open-wizard':openOnboardingModal(1);break;
+    case 'dismiss-guide':state.profile.showGuide=false;save();render();break;
+    case 'show-guide':state.profile.showGuide=true;save();location.hash='today';render();break;
     case 'close-modal':clearInterval(breathInterval);$('#modalRoot').innerHTML='';break;
     case 'slot':{const c=state.checks[k]=state.checks[k]||{};c[d.id]=!c[d.id];save();render();break;}
     case 'focus-start':startFocus(+d.min);break;
@@ -825,7 +1243,7 @@ function act(a,el){
     case 'prot':state.protein[k]=Math.max(0,(state.protein[k]||0)+(+d.n));save();render();toast('Protein updated: '+state.protein[k]+'g');break;
     case 'water':state.water[k]=Math.max(0,(state.water[k]||0)+(+d.n));save();render();break;
     case 'social':state.social[k]=Math.max(0,(state.social[k]||0)+(+d.n));save();render();break;
-    case 'shift':state.shift=Math.max(-90,Math.min(120,(state.shift||0)+(+d.n)));save();render();toast('Schedule shifted to start at '+fmtMin(mins(SLOTS[0].t)+state.shift));break;
+    case 'shift':state.shift=Math.max(-90,Math.min(180,(state.shift||0)+(+d.n)));save();render();toast('Schedule shifted to start at '+fmtMin(mins(SLOTS[0].t)+state.shift));break;
     case 'export-ics':exportIcs();break;
     case 'enable-notif':
       if(!('Notification' in window))toast('Browser notifications not supported in this view.');
@@ -872,16 +1290,32 @@ function act(a,el){
         c.linked=true;c.read=true;c.write=true;c.modify=true;
         if(!c.account)c.account=it.placeholder.split('(')[0].trim();
       });
-      logSync('chief','gcalendar','AUTH','Authorized all 8 external app integrations (Google Calendar, Sheets, Docs, Gmail, Apple Messages, WhatsApp, Facebook & YouTube/iOS) with READ/WRITE/MODIFY permissions.');
+      logSync('chief','gcalendar','AUTH','Authorized all 8 external app integrations with READ/WRITE/MODIFY permissions.');
       render();
       toast('All 8 services linked with Read/Write/Modify permissions!');
       break;
     }
     case 'clear-synclog':state.syncLog=[];save();render();break;
+    case 'pref-dish':{
+      const list=state.profile.favoriteDishes=state.profile.favoriteDishes||[];
+      const idx=list.indexOf(d.id);
+      if(idx>=0){if(list.length>1)list.splice(idx,1);else toast('Keep at least 1 favorite dish selected.');}
+      else list.push(d.id);
+      save();render();
+      break;
+    }
+    case 'pref-sport':{
+      const list=state.profile.favoriteSports=state.profile.favoriteSports||[];
+      const idx=list.indexOf(d.sport);
+      if(idx>=0)list.splice(idx,1);
+      else list.push(d.sport);
+      save();render();
+      break;
+    }
     case 'export-json':{
       const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='steady-backup-'+dkey()+'.json';a.click();
-      toast('Backup JSON downloaded.');
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='steady-'+(currentUser?currentUser.email.split('@')[0]:'backup')+'-'+dkey()+'.json';a.click();
+      toast('Private account backup downloaded.');
       break;
     }
   }
@@ -902,6 +1336,25 @@ function field(f,el){
     case 'v-next':{const v=state.ventures.find(x=>x.id===d.id);if(v){v.next=el.value.trim();save();}break;}
     case 'bridge-goal':state.bridge.goal=el.value.replace(/[^\d]/g,'');save();render();break;
     case 'bridge-earned':state.bridge.earned=el.value.replace(/[^\d]/g,'');save();render();break;
+    case 'prof':{
+      state.profile[d.k]=el.value.trim();
+      if(d.k==='wakeTime')state.shift=Math.max(-90,Math.min(180,mins(el.value)-mins('06:00')));
+      if(d.k==='name'&&currentUser){
+        currentUser.name=state.profile.name;
+        const accs=loadAccounts();
+        if(accs[currentUser.email]){accs[currentUser.email].name=state.profile.name;saveAccounts(accs);}
+        updateUserChip();
+      }
+      save();
+      toast('Preference saved.');
+      break;
+    }
+    case 'prof-num':{
+      state.profile[d.k]=+el.value||0;
+      save();render();
+      toast('Target updated.');
+      break;
+    }
   }
 }
 
@@ -946,7 +1399,7 @@ function form(f,el){
     }
     case 'venture':{
       const inp=el.querySelector('input'),v=inp.value.trim();
-      if(v){state.ventures.push({id:rid(),name:v,stage:0,next:'Define first validation conversation',active:false});save();render();}
+      if(v){state.ventures.push({id:rid(),name:v,stage:0,next:'Define first validation conversation',active:!state.ventures.length});save();render();}
       break;
     }
     case 'family-log':{
@@ -954,12 +1407,46 @@ function form(f,el){
       if(activity){state.familyLog.push({id:rid(),date:k,who,activity,note});save();render();toast('Family moment saved!');}
       break;
     }
+    case 'pref-custom-dish':{
+      const nm=el.name.value.trim(),pr=+el.protein.value||45,ings=el.ings.value.split(',').map(x=>({item:x.trim(),cat:'Meat & Seafood'})).filter(x=>x.item);
+      if(nm){
+        const id='cust_'+rid();
+        state.profile.customDishes=state.profile.customDishes||[];
+        state.profile.customDishes.push({id,name:nm,slot:'Custom Favorite',protein:pr,cals:pr*10,prep:'15 min',ingredients:ings,steps:'Custom favorite high-protein recipe.'});
+        state.profile.favoriteDishes=state.profile.favoriteDishes||[];
+        state.profile.favoriteDishes.push(id);
+        save();render();
+        toast('Added '+nm+' to your favorite dishes!');
+      }
+      break;
+    }
+    case 'change-pass':{
+      const pw=el.newpass.value;
+      if(pw.length<4){toast('Password must be at least 4 characters.');return;}
+      if(currentUser){
+        const accs=loadAccounts();
+        if(accs[currentUser.email]){
+          accs[currentUser.email].passHash=simpleHash(pw);
+          saveAccounts(accs);
+          el.reset();
+          toast('Password updated for '+currentUser.email+'!');
+        }
+      }
+      break;
+    }
   }
 }
 
-document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b){if(b.tagName==='A')return;act(b.dataset.act,b);}});
-document.addEventListener('change',e=>{const f=e.target.closest('[data-field]');if(f)field(f.dataset.field,f);});
-document.addEventListener('submit',e=>{const f=e.target.closest('form[data-form]');if(f){e.preventDefault();form(f.dataset.form,f);}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&main.contains(b)){if(b.tagName==='A')return;act(b.dataset.act,b);}else if(b&&$('#modalRoot').contains(b)){act(b.dataset.act,b);}});
+document.addEventListener('change',e=>{const f=e.target.closest('[data-field]');if(f&&main.contains(f))field(f.dataset.field,f);});
+document.addEventListener('submit',e=>{const f=e.target.closest('form[data-form]');if(f&&main.contains(f)){e.preventDefault();form(f.dataset.form,f);}});
 
-setSync();
-route();
+/* ---------- Boot Session or Prompt Login ---------- */
+(function initApp(){
+  const sessUser=loadSessionUser();
+  if(sessUser){
+    loginUser(sessUser,false);
+  } else {
+    render();
+  }
+})();
