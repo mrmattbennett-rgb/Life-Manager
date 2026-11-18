@@ -64,6 +64,12 @@ const AG={
     owns:'Quality time with partner, kids, friends, and favorite sports & bonding activities.',
     watches:'Phone-free family dinners, bedtime routines, outdoor sports, and weekly connection rituals.',
     style:'Warm family architect. Suggest specific activities, sports games, and meaningful conversations.'
+  },
+  personal:{
+    name:'Blocked Time',role:'Personal Obligation (Outside App)',
+    owns:'External appointments, kids school events, errands, doctor visits, and off-grid personal commitments.',
+    watches:'Protecting blocked personal obligations from work or agent interruptions.',
+    style:'Strict calendar guardian.'
   }
 };
 
@@ -75,26 +81,57 @@ const PROGRAM_PACKS=[
   {id:'Health, High-Protein & Family Balance',desc:'Automated high-protein meal planning, aisle-sorted weekly grocery list, daily workouts, and family sports scheduling.'}
 ];
 
+const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+/* ---------- Logical Gap-Filler Pool (Auto-Fills Vacated or Off-Day Time Slots) ---------- */
+const GAP_POOL=[
+  {id:'gf_weekend_morn',minStart:360,minEnd:510,title:'Weekend Morning Mobility, Coffee & Family Slow Start',detail:'Markets are closed—enjoy a screen-free morning walk, stretch, and coffee with your partner and kids.',agent:'circle'},
+  {id:'gf_morn_strategy',minStart:360,minEnd:540,title:'Venture Strategy, Weekly Review & Deep Reading',detail:'Use this open morning window for high-leverage thinking, book/industry reading, or refining your #1 venture offer.',agent:'launch'},
+  {id:'gf_mid_outreach',minStart:540,minEnd:750,title:'Warm Network Follow-Ups & Pipeline Builder',detail:'Send 3 quick voice notes or messages to partners, founders, or clients and log them on the Ventures tab.',agent:'launch'},
+  {id:'gf_aft_recovery',minStart:750,minEnd:990,title:'Active Recovery, Practice Drill or Parking Lot Sprint',detail:'No DIY scheduled today—get 30 mins of pickleball/golf/court practice or clear 3 items from your distraction Parking Lot.',agent:'body'},
+  {id:'gf_eve_connect',minStart:990,minEnd:1350,title:'Unplugged Family & Personal Recharge Window',detail:'Phones away—board games, evening walk, or 1-on-1 conversation at home.',agent:'circle'}
+];
+
 /* ---------- Daily Schedule Template ---------- */
 const SLOTS=[
-  {id:'wake',t:'06:00',title:'Wake up, hydration & Morning Ignition Gate',detail:'No social feeds. Drink 16oz water. Complete Spark reaffirmation, reflection & 60s breathing.',agent:'spark'},
-  {id:'market',t:'06:30',title:'Morning Market Open & Structured Trade Window',detail:'Check Ticker watchlist, run pre-trade checklist, max 2 A+ setups. Hard stop at 8:00 AM.',agent:'ticker',deep:true},
-  {id:'workout',t:'07:45',title:'Forced Workout & Morning Sunlight',detail:'40-min strength, conditioning, or court movement to prime energy and focus.',agent:'body'},
-  {id:'breakfast',t:'08:30',title:'High-Protein Breakfast (50g+ protein) & Big 3',detail:'Eggs, cottage cheese, Greek yogurt, or shake. Lock in today’s Big 3 outcomes with Anchor.',agent:'body'},
-  {id:'deep1',t:'09:00',title:'Deep Block 1: #1 Venture / Career Revenue Action',detail:'Phone out of reach. Send 5 high-value outreach messages or ship the next piece of your active venture.',agent:'launch',deep:true},
-  {id:'reset1',t:'10:45',title:'10-Minute Movement & Dopamine Reset',detail:'Pushups, walk, cold water, empty stray thoughts into the Parking Lot.',agent:'anchor'},
-  {id:'deals',t:'11:00',title:'Time-Boxed Deal Hunt / Reseller & Flip Ops',detail:'45-min cap: check Scout targets on FB Marketplace, OfferUp, eBay, Slickdeals, or list inventory.',agent:'scout',deep:true},
-  {id:'lunch',t:'12:00',title:'High-Protein Lunch (55g protein) — Screen-Free',detail:'Chicken, steak, salmon, or tuna bowl. Eat away from the desk.',agent:'body'},
-  {id:'deep2',t:'13:00',title:'Deep Block 2: Build, Partnership Calls or Execution',detail:'Move your primary venture or project one tangible stage forward.',agent:'launch',deep:true},
-  {id:'diy',t:'14:30',title:'Home / Auto DIY Project or Household Sprint',detail:'Tackle 1 Wrench checklist step (using AI + YouTube guide) or clear household admin.',agent:'wrench'},
-  {id:'scroll',t:'15:30',title:'Scheduled Social Media Window (Inside Budget)',detail:'Guilt-free scroll or sports highlights inside your daily social budget.',agent:'anchor'},
-  {id:'family_sport',t:'16:00',title:'Family Bonding & Sports Block',detail:'Play your favorite sports or outdoor activities with family and kids.',agent:'circle'},
-  {id:'dinner_prep',t:'17:45',title:'High-Protein Dinner Prep Together',detail:'Cook tonight’s selected Body recipe. Phones go in the basket.',agent:'body'},
-  {id:'dinner',t:'18:30',title:'Family Dinner — Highs, Lows & Gratitude',detail:'Ask everyone for one win and one highlight from today.',agent:'circle'},
-  {id:'bed_daughter',t:'19:45',title:'Kids Evening Routine & Story / Family Wind-Down',detail:'Full presence—reading, conversation, lights down.',agent:'circle'},
-  {id:'wife_son',t:'20:15',title:'Partner Connection & Evening Tea',detail:'Unwind and connect 1-on-1 without screens.',agent:'circle'},
-  {id:'debrief',t:'21:00',title:'Chief Evening Debrief & Tomorrow’s Lock',detail:'Log wins, review discipline, clear Parking Lot, set tomorrow’s Big 3.',agent:'anchor'},
-  {id:'lights',t:'21:45',title:'Phone on Charger Outside Bedroom & Lights Out',detail:'Protect sleep so tomorrow’s wake-up is automatic.',agent:'body'}
+  {id:'wake',t:'06:00',dur:30,days:[0,1,2,3,4,5,6],title:'Wake up, hydration & Morning Ignition Gate',detail:'No social feeds. Drink 16oz water. Complete Spark reaffirmation, reflection & 60s breathing.',agent:'spark'},
+  {
+    id:'market',t:'06:30',dur:75,days:[1,2,3,4,5],
+    title:'Morning Market Open & Structured Trade Window',
+    detail:'Weekdays only (Mon–Fri). Check Ticker watchlist, run pre-trade checklist, max 2 A+ setups. Hard stop at 8:00 AM.',
+    agent:'ticker',deep:true,
+    fallback:{title:'Weekend Morning Mobility, Coffee & Family Slow Start',detail:'Stock market is closed on weekends—enjoy morning light, mobility, and coffee with family.',agent:'circle'}
+  },
+  {id:'workout',t:'07:45',dur:45,days:[0,1,2,3,4,5,6],title:'Forced Workout & Morning Sunlight',detail:'40-min strength, conditioning, or court movement to prime energy and focus.',agent:'body'},
+  {id:'breakfast',t:'08:30',dur:30,days:[0,1,2,3,4,5,6],title:'High-Protein Breakfast (50g+ protein) & Big 3',detail:'Eggs, cottage cheese, Greek yogurt, or shake. Lock in today’s Big 3 outcomes with Anchor.',agent:'body'},
+  {id:'deep1',t:'09:00',dur:105,days:[0,1,2,3,4,5,6],title:'Deep Block 1: #1 Venture / Career Revenue Action',detail:'Phone out of reach. Send 5 high-value outreach messages or ship the next piece of your active venture.',agent:'launch',deep:true},
+  {id:'reset1',t:'10:45',dur:15,days:[0,1,2,3,4,5,6],title:'10-Minute Movement & Dopamine Reset',detail:'Pushups, walk, cold water, empty stray thoughts into the Parking Lot.',agent:'anchor'},
+  {
+    id:'deals',t:'11:00',dur:60,days:[1,2,3,4,5,6],
+    title:'Time-Boxed Deal Hunt / Reseller & Flip Ops',
+    detail:'45-min cap: check Scout targets on FB Marketplace, OfferUp, eBay, Slickdeals, or list inventory.',
+    agent:'scout',deep:true,
+    fallback:{title:'Sunday Family Outing Prep & Weekly Meal/Grocery Lock',detail:'Review Body weekly meal plan and prep for an unplugged Sunday afternoon with family.',agent:'body'}
+  },
+  {id:'lunch',t:'12:00',dur:60,days:[0,1,2,3,4,5,6],title:'High-Protein Lunch (55g protein) — Screen-Free',detail:'Chicken, steak, salmon, or tuna bowl. Eat away from the desk.',agent:'body'},
+  {id:'deep2',t:'13:00',dur:90,days:[1,2,3,4,5],title:'Deep Block 2: Build, Partnership Calls or Execution',detail:'Move your primary venture or project one tangible stage forward.',agent:'launch',deep:true,
+    fallback:{title:'Weekend Family Adventure / Sports Match',detail:'Extended weekend window for golf, pickleball, desert hike, or pool time with the family.',agent:'circle'}
+  },
+  {
+    id:'diy',t:'14:30',dur:60,days:[2,4,6],
+    title:'Home / Auto DIY Project or Household Sprint',
+    detail:'Scheduled Tue / Thu / Sat: tackle 1 Wrench checklist step (using AI + YouTube guide).',
+    agent:'wrench',
+    fallback:{title:'Active Recovery, Sports Practice or Pipeline Follow-Up',detail:'Non-DIY day: hit the pickleball/tennis court, practice golf chipping, or clear 3 items from your Parking Lot.',agent:'body'}
+  },
+  {id:'scroll',t:'15:30',dur:30,days:[0,1,2,3,4,5,6],title:'Scheduled Social Media Window (Inside Budget)',detail:'Guilt-free scroll or sports highlights inside your daily social budget.',agent:'anchor'},
+  {id:'family_sport',t:'16:00',dur:105,days:[0,1,2,3,4,5,6],title:'Family Bonding & Sports Block',detail:'Play your favorite sports or outdoor activities with family and kids.',agent:'circle'},
+  {id:'dinner_prep',t:'17:45',dur:45,days:[0,1,2,3,4,5,6],title:'High-Protein Dinner Prep Together',detail:'Cook tonight’s selected Body recipe. Phones go in the basket.',agent:'body'},
+  {id:'dinner',t:'18:30',dur:75,days:[0,1,2,3,4,5,6],title:'Family Dinner — Highs, Lows & Gratitude',detail:'Ask everyone for one win and one highlight from today.',agent:'circle'},
+  {id:'bed_daughter',t:'19:45',dur:30,days:[0,1,2,3,4,5,6],title:'Kids Evening Routine & Story / Family Wind-Down',detail:'Full presence—reading, conversation, lights down.',agent:'circle'},
+  {id:'wife_son',t:'20:15',dur:45,days:[0,1,2,3,4,5,6],title:'Partner Connection & Evening Tea',detail:'Unwind and connect 1-on-1 without screens.',agent:'circle'},
+  {id:'debrief',t:'21:00',dur:45,days:[0,1,2,3,4,5,6],title:'Chief Evening Debrief & Tomorrow’s Lock',detail:'Log wins, review discipline, clear Parking Lot, set tomorrow’s Big 3.',agent:'anchor'},
+  {id:'lights',t:'21:45',dur:30,days:[0,1,2,3,4,5,6],title:'Phone on Charger Outside Bedroom & Lights Out',detail:'Protect sleep so tomorrow’s wake-up is automatic.',agent:'body'}
 ];
 
 /* ---------- Master Catalog of High-Protein Recipes ---------- */
@@ -436,6 +473,7 @@ function founderPreset(email,name){
     familyLog:[
       {id:'fl_1',date:dkey(),who:'Son (12) & Daughter (7)',activity:'Twilight Pickleball + Ice Cream',note:'Son hit 12 rally shots in a row; daughter loved keeping score.'}
     ],
+    customSlots:JSON.parse(JSON.stringify(SLOTS)),
     connections:{
       gcalendar:{linked:false,account:'',read:true,write:true,modify:true,lastSync:0},
       gsheets:{linked:false,account:'',read:true,write:true,modify:true,lastSync:0},
@@ -504,6 +542,7 @@ function freshUserDefaults(email,name){
     targets:{convos:5,shipped:2,flipsListed:3},
     bridge:{goal:'5000',earned:'0'},
     familyLog:[],
+    customSlots:JSON.parse(JSON.stringify(SLOTS)),
     connections:{
       gcalendar:{linked:false,account:email||'',read:true,write:true,modify:true,lastSync:0},
       gsheets:{linked:false,account:email||'',read:true,write:true,modify:true,lastSync:0},
@@ -538,6 +577,14 @@ function normalize(s,isFresh,email,name){
   ['wins','parking','messages','tasks','whys','customGroceries','watchlist','trades','hunts','flips','projects','ventures','familyLog','syncLog'].forEach(k=>{
     if(!Array.isArray(o[k]))o[k]=d[k];
   });
+  if(!Array.isArray(o.customSlots)||!o.customSlots.length){
+    o.customSlots=JSON.parse(JSON.stringify(SLOTS));
+  } else {
+    o.customSlots=o.customSlots.map(sl=>{
+      const def=SLOTS.find(x=>x.id===sl.id)||{};
+      return Object.assign({dur:def.dur||45,days:def.days||[0,1,2,3,4,5,6],fallback:def.fallback||null},sl);
+    });
+  }
   if(!Array.isArray(o.tradeRules.checklist))o.tradeRules.checklist=[false,false,false];
   return o;
 }
