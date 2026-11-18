@@ -172,6 +172,7 @@ function copyText(txt,msg){
 
 function executeAgentAction(svcId,agentId,op,actionKey){
   const k=dkey(),n=slotNow(),c=getConn(svcId),actV=state.ventures.find(v=>v.active)||state.ventures[0];
+  const prof=state.profile||{},city=prof.city||'your city',recs=activeRecipes();
   switch(actionKey){
     case 'gcal_push_now':{
       const cur=n.cur,st=slotMin(cur),en=st+45;
@@ -190,7 +191,7 @@ function executeAgentAction(svcId,agentId,op,actionKey){
       break;
     }
     case 'gcal_family_sport':{
-      const f=FAMILY_IDEAS[0];
+      const f=activeFamilyIdeas()[0]||FAMILY_IDEAS[0];
       const d=new Date(),ymd=d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
       const url=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('[Circle] '+f.title)}&details=${encodeURIComponent(f.note+' ('+f.who+')')}&dates=${ymd}T160000/${ymd}T171500`;
       logSync('circle','gcalendar','WRITE',`Circle scheduled "${f.title}" at 4:00 PM on Google Calendar.`);
@@ -203,10 +204,12 @@ function executeAgentAction(svcId,agentId,op,actionKey){
       const rows=[['Category','Ingredient','Status','Meal Plan Week']];
       const seen={};
       days.forEach(d=>{
-        const r=RECIPES.find(x=>x.id===state.mealPlan[d])||RECIPES[0];
-        r.ingredients.forEach(i=>{
-          if(!seen[i.item]){seen[i.item]=true;rows.push([i.cat,i.item,state.groceryChecked[i.item]?'Checked':'Need',wkey()]);}
-        });
+        const r=recs.find(x=>x.id===state.mealPlan[d])||RECIPES.find(x=>x.id===state.mealPlan[d])||recs[0];
+        if(r&&r.ingredients){
+          r.ingredients.forEach(i=>{
+            if(!seen[i.item]){seen[i.item]=true;rows.push([i.cat,i.item,state.groceryChecked[i.item]?'Checked':'Need',wkey()]);}
+          });
+        }
       });
       state.customGroceries.forEach(g=>rows.push(['Custom',g,state.groceryChecked[g]?'Checked':'Need',wkey()]));
       const tsv=rows.map(r=>r.join('\t')).join('\n');
@@ -238,7 +241,7 @@ function executeAgentAction(svcId,agentId,op,actionKey){
     }
     case 'gdocs_reflection':{
       const m=state.morningDone[k]||{},b=getBig3(k);
-      const doc=`# Steady Daily Reflection & Executive Brief (${k})\n`+
+      const doc=`# Steady Daily Reflection & Executive Brief (${k} · ${prof.name||'Owner'})\n`+
         `Reaffirmation Completed: ${m.aff?'Yes':'Pending'}\n`+
         `Morning Self-Reflection: ${m.ref||'(Not entered yet)'}\n`+
         `Big 3 Outcomes:\n1. ${b[0].t||'Unset'}\n2. ${b[1].t||'Unset'}\n3. ${b[2].t||'Unset'}\n`+
@@ -250,13 +253,13 @@ function executeAgentAction(svcId,agentId,op,actionKey){
       break;
     }
     case 'gdocs_venture_pitch':{
-      const doc=`# Partnership & Venture Brief: ${actV?actV.name:'Steady'}\n`+
-        `Founder Background: Ex-Google Business Development, Sales & Strategic Partnerships (Palm Springs, CA)\n`+
+      const doc=`# Partnership & Venture Brief: ${actV?actV.name:'Primary Venture'}\n`+
+        `Founder: ${prof.name||'Founder'} (${prof.careerBackground||'Entrepreneur'} · ${city})\n`+
         `Current Stage: ${['Idea','Validate','Offer','Launch','Revenue'][actV?actV.stage:1]}\n`+
         `Immediate Next Milestone: ${actV?actV.next:''}\n`+
         `Weekly Scoreboard: ${week().convos} partner convos · ${week().shipped} deliverables shipped.\n`;
       copyText(doc,'Launch drafted your Venture One-Pager to clipboard for Google Docs!');
-      logSync('launch','gdocs','WRITE',`Launch generated ex-Google BD One-Pager for "${actV?actV.name:'Steady'}" in Google Docs.`);
+      logSync('launch','gdocs','WRITE',`Launch generated Venture One-Pager for "${actV?actV.name:'Primary Venture'}" in Google Docs.`);
       if(c.account&&c.account.startsWith('http'))window.open(c.account,'_blank','noopener');
       render();
       break;
@@ -273,64 +276,65 @@ function executeAgentAction(svcId,agentId,op,actionKey){
       break;
     }
     case 'gmail_bd_outreach':{
-      const subj=`Quick BD / Partnership question — ${actV?actV.name:'Steady'}`;
-      const body=`Hi [Name],\n\nHope you're doing well! Coming from my time in Business Development & Partnerships at Google, I'm currently building ${actV?actV.name:'a new venture'} here in Palm Springs.\n\nNext milestone I'm executing this week: ${actV?actV.next:'validating with 5 leaders'}.\n\nWould love 12 minutes this week to get your perspective or explore a partnership angle.\n\nBest,\n[Your Name]`;
+      const subj=`Quick Partnership / Venture question — ${actV?actV.name:'New Venture'}`;
+      const body=`Hi [Name],\n\nHope you're doing well! ${prof.careerBackground?'Coming from my background in '+prof.careerBackground+', ':''}I'm currently building ${actV?actV.name:'a new venture'}${prof.city?' here in '+prof.city:''}.\n\nNext milestone I'm executing this week: ${actV?actV.next:'validating with 5 leaders'}.\n\nWould love 12 minutes this week to get your perspective or explore a partnership angle.\n\nBest,\n${prof.name||'[Your Name]'}`;
       const url=`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-      logSync('launch','gmail','WRITE',`Launch drafted warm ex-Google BD outreach email in Gmail for "${actV?actV.name:'Steady'}".`);
+      logSync('launch','gmail','WRITE',`Launch drafted warm outreach email in Gmail for "${actV?actV.name:'Active Venture'}".`);
       window.open(url,'_blank','noopener');
       render();
       break;
     }
     case 'gmail_read_deals':{
-      logSync('scout','gmail','READ',`Scout scanned Gmail (${c.account}) for Slickdeals price alerts, B-Stock liquidator manifests & eBay sold receipts.`);
-      state.tasks.push({id:rid(),agent:'scout',title:'Review Gmail Slickdeals & Liquidator manifest digest (2 high-ROI matches)',done:false,ts:Date.now()});
+      logSync('scout','gmail','READ',`Scout scanned Gmail (${c.account}) for Slickdeals price alerts, liquidator manifests & eBay sold receipts.`);
+      state.tasks.push({id:rid(),agent:'scout',title:'Review Gmail Slickdeals & Liquidator manifest digest',done:false,ts:Date.now()});
       save();render();
       toast('Scout scanned Gmail alerts and added a task.');
       break;
     }
     case 'imessage_wife':{
       const phone=(c.account||'').replace(/[^\d+]/g,'');
-      const r=RECIPES.find(x=>x.id===state.mealPlan[['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]])||RECIPES[0];
-      const txt=`Hey love ❤️ Checking in from my Steady dashboard — planning ${r.name} (${r.protein}g protein) for dinner tonight and 4:00 PM sports with the kids. Need anything while I'm out?`;
-      logSync('circle','imessage','WRITE',`Circle prepared iMessage check-in to your wife with tonight's dinner (${r.name}) & 4pm kids plan.`);
+      const r=recs.find(x=>x.id===state.mealPlan[['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]])||recs[0];
+      const txt=`Hey ❤️ Checking in from my Steady dashboard — planning ${r.name} (${r.protein}g protein) for dinner tonight and 4:00 PM family time. Need anything while I'm out?`;
+      logSync('circle','imessage','WRITE',`Circle prepared iMessage check-in to ${prof.spouseName||'partner'} with tonight's dinner (${r.name}).`);
       window.location.href=`sms:${phone}?&body=${encodeURIComponent(txt)}`;
       render();
       break;
     }
     case 'imessage_sports':{
       const phone=(c.account||'').replace(/[^\d+]/g,'');
-      const txt=`Hey! Up for 9 holes of twilight golf or pickleball in Palm Springs at 4:00 PM today? Bringing my 12yo son too.`;
-      logSync('circle','imessage','WRITE',`Circle launched Apple Messages sports invite (Golf / Pickleball).`);
+      const sp=(prof.favoriteSports&&prof.favoriteSports[0])||'Pickleball / Golf';
+      const txt=`Hey! Up for ${sp}${prof.city?' in '+prof.city:''} at 4:00 PM today?`;
+      logSync('circle','imessage','WRITE',`Circle launched Apple Messages sports invite (${sp}).`);
       window.location.href=`sms:${phone}?&body=${encodeURIComponent(txt)}`;
       render();
       break;
     }
     case 'whatsapp_family':{
       const phone=(c.account||'').replace(/[^\d]/g,'');
-      const txt=`Sveiki! Family update from Palm Springs 🌴 Making Biezpiena Plācenīši with the kids (12 and 7) and playing pickleball at 4pm!`;
-      logSync('circle','whatsapp','WRITE',`Circle launched WhatsApp message for wife & family in Latvia.`);
+      const txt=`Family update${prof.city?' from '+prof.city:''}! Cooking a high-protein dinner together tonight and getting outdoors at 4pm!`;
+      logSync('circle','whatsapp','WRITE',`Circle launched WhatsApp message for family thread.`);
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(txt)}`,'_blank','noopener');
       render();
       break;
     }
     case 'whatsapp_bd':{
       const phone=(c.account||'').replace(/[^\d]/g,'');
-      const txt=`Hey! Following up on our partnership chat — moving ${actV?actV.name:'our pilot'} forward today. Free for a quick 10-min call?`;
+      const txt=`Hey! Following up on our partnership chat — moving ${actV?actV.name:'our project'} forward today. Free for a quick 10-min call?`;
       logSync('launch','whatsapp','WRITE',`Launch opened WhatsApp partner follow-up thread.`);
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(txt)}`,'_blank','noopener');
       render();
       break;
     }
     case 'fb_listing_write':{
-      const f=state.flips[0]||{item:'Brand New / Open Box Gear',sell:350};
-      const copy=`🌴 PALM SPRINGS LOCAL PICKUP OR FAST SHIP 🌴\nItem: ${f.item}\nPrice: $${f.sell} (Cash / Venmo / Verified Reseller)\nCondition: Tested & ready. Message for quick pickup in Palm Springs (92262).`;
+      const f=state.flips[0]||{item:'Open Box Gear',sell:350};
+      const copy=`LOCAL PICKUP OR FAST SHIP (${city.toUpperCase()})\nItem: ${f.item}\nPrice: $${f.sell}\nCondition: Tested & ready. Message for quick pickup.`;
       copyText(copy,'Scout copied Facebook Marketplace listing & seller script to clipboard!');
       logSync('scout','facebook','WRITE',`Scout generated & copied FB Marketplace listing for "${f.item}" ($${f.sell}).`);
       render();
       break;
     }
     case 'fb_marketplace_read':{
-      const h=state.hunts[0]||{item:'Breville Espresso',maxBuy:400};
+      const h=state.hunts[0]||{item:'Espresso Machine',maxBuy:400};
       logSync('scout','facebook','READ',`Scout scanned Facebook Marketplace (${c.account}) for "${h.item}" under $${h.maxBuy}.`);
       window.open(`https://www.facebook.com/marketplace/search/?query=${encodeURIComponent(h.item)}`,'_blank','noopener');
       render();
@@ -356,7 +360,7 @@ function domainIntegrationsBar(agentId,items){
     </div>
     <div class="row" style="margin-top:4px">
       ${items.map(x=>{
-        const c=getConn(x.svc),svc=getSvc(x.svc);
+        const c=getConn(x.svc);
         return `<button class="btn sm ${c.linked?'':'sun'}" type="button" data-act="agent-int" data-svc="${x.svc}" data-agent="${agentId}" data-op="${x.op}" data-key="${x.key}">
           ${c.linked?'✓':'⚡ Link &'} ${esc(x.label)} <span class="mono small" style="opacity:.75">[${esc(x.op)}]</span>
         </button>`;
@@ -367,7 +371,8 @@ function domainIntegrationsBar(agentId,items){
 
 /* ---------- Chief of Staff Intelligence Engine ---------- */
 function buildChiefReply(qText){
-  const k=dkey(),n=slotNow(),b=getBig3(k),w=week();
+  const k=dkey(),n=slotNow(),b=getBig3(k);
+  const prof=state.profile||{},pTarget=prof.proteinTarget||180;
   const actV=state.ventures.find(v=>v.active)||state.ventures[0];
   const prot=state.protein[k]||0,soc=state.social[k]||0;
   const todayPnl=state.trades.filter(t=>t.date===k).reduce((a,x)=>a+(+x.pnl||0),0);
@@ -376,57 +381,56 @@ function buildChiefReply(qText){
 
   let reply='',issued=[];
   if(s.includes('morning')||s.includes('brief')){
-    reply=`Good morning in Palm Springs. Here is your Chief of Staff gameplan:\n\n`+
-      `1. **Mindset & Body (Spark + Body):** Complete your Morning Ignition Gate if you haven't yet. Target **180g+ protein** today (currently ${prot}g) and get your workout done before the desert heat climbs.\n`+
-      `2. **Morning Market Window (Ticker):** Market opens at 6:30 AM PT. You have a hard stop at **${state.tradeRules.stopTime} AM** and a max of ${state.tradeRules.maxTrades} A+ setups. Do not let chart-watching bleed into your 9:00 AM revenue block.\n`+
-      `3. **Income & Partnerships (Launch + Scout):** Active venture is **${actV?actV.name:'Steady'}**. Your #1 move at 9:00 AM: *${actV?actV.next:'Reach out to 3 Google BD contacts'}*. At 11:00 AM, Scout has a strict 45-min cap for reseller deal hunting.\n`+
-      `4. **Family & Sports (Circle):** 4:00 PM is locked for your 12yo son and 7yo daughter, followed by a phone-free family dinner with your wife.`;
+    reply=`Good morning${prof.name?', '+prof.name:''}${prof.city?' in '+prof.city:''}. Here is your Chief of Staff gameplan (${prof.programPack||'Steady OS'}):\n\n`+
+      `1. **Mindset & Body (Spark + Body):** Complete your Morning Ignition Gate if you haven't yet. Target **${pTarget}g+ protein** today (currently ${prot}g) and complete your **${prof.workoutStyle||'daily workout'}**.\n`+
+      `2. **Morning Market Window (Ticker):** You have a hard stop at **${state.tradeRules.stopTime} AM** and a max of ${state.tradeRules.maxTrades} setups. Protect your focus for your 9:00 AM revenue block.\n`+
+      `3. **Income & Ventures (Launch + Scout):** Active venture is **${actV?actV.name:'your primary project'}**. Your #1 move at 9:00 AM: *${actV?actV.next:'Complete 3 high-value outreach conversations'}*.\n`+
+      `4. **Family & Sports (Circle):** 4:00 PM is locked for ${prof.kidsDesc||prof.spouseName||'family bonding'} (${(prof.favoriteSports||[]).slice(0,3).join(', ')||'sports & outdoor play'}), followed by a phone-free dinner.`;
     issued=[
-      {agent:'spark',title:'Complete Morning Reaffirmation & 2-min Breathing Gate'},
-      {agent:'ticker',title:'Enforce 8:00 AM PT hard stop after morning trade window'},
-      {agent:'launch',title:'Send 3 warm outreach messages using Google BD background'}
+      {agent:'spark',title:'Complete Morning Reaffirmation & 60s Breathing Gate'},
+      {agent:'body',title:'Hit '+pTarget+'g protein target & '+clip(prof.workoutStyle||'Morning Workout',35)},
+      {agent:'launch',title:clip(actV&&actV.next?actV.next:'Send 3 high-value outreach messages',65)}
     ];
   } else if(s.includes('trade')||s.includes('market')||s.includes('stock')){
     reply=`**Ticker Risk Desk Check-In:**\n`+
       `• Today's Net P&L: **$${todayPnl}** (Max daily loss guardrail: -$${state.tradeRules.maxLoss}).\n`+
-      `• Watchlist focus: ${state.watchlist.map(w=>w.sym+' ('+w.bias+')').join(', ')}.\n`+
-      `• **ADHD Trading Rule:** Boredom is not a signal. Verify all 3 Pre-Trade Checklist boxes on the Markets tab before clicking buy, and close your brokerage tab at **${state.tradeRules.stopTime} AM PT** sharp so you can build your business.`;
-    issued=[{agent:'ticker',title:'Log opening setup thesis and close brokerage at 8:00 AM PT'}];
+      `• Watchlist focus: ${state.watchlist.length?state.watchlist.map(w=>w.sym+' ('+w.bias+')').join(', '):'No tickers added yet'}.\n`+
+      `• **Trading Discipline Rule:** Boredom is not a signal. Verify all 3 Pre-Trade Checklist boxes on the Markets tab before entry, and close your charts at **${state.tradeRules.stopTime} AM** sharp.`;
+    issued=[{agent:'ticker',title:'Log opening setup thesis and close charts at '+state.tradeRules.stopTime+' AM'}];
   } else if(s.includes('stuck')||s.includes('paralysis')||s.includes('phone')||s.includes('scroll')){
     const trig=TRIGGERS[Math.floor(Math.random()*TRIGGERS.length)];
     reply=`**Pattern Interrupt (Anchor + Shield + Spark):**\n`+
-      `Zero guilt—your ADHD brain is just looking for cheap dopamine. Let's flip the switch in 90 seconds:\n\n`+
+      `Zero guilt—your brain is just looking for quick dopamine. Let's flip the switch in 90 seconds:\n\n`+
       `1. **Physical Reset:** Stand up right now, drink a glass of water, and do 15 pushups or air squats.\n`+
       `2. **Action Trigger:** ${trig}\n`+
       `3. **Right Now Block:** *${n.cur.title}*. Start a 25-minute Focus Timer on the Today tab and park every stray idea in the Parking Lot.`;
     issued=[{agent:'anchor',title:'Run a 25-minute single-task Focus Timer right now'}];
   } else if(s.includes('deal')||s.includes('flip')||s.includes('resell')||s.includes('marketplace')){
-    reply=`**Scout Arbitrage & Reseller Brief:**\n`+
+    reply=`**Scout Arbitrage & Deal Brief:**\n`+
       `Your active flip pipeline has **$${netFlip} in projected net profit** across ${state.flips.length} items.\n\n`+
-      `• **Rule #1:** Deal hunting on FB Marketplace, OfferUp, eBay, and Slickdeals happens inside a **45-minute timer** so it stays a profit center, not a 3-hour distraction.\n`+
-      `• **Rule #2:** Before buying anything with your reseller license, plug the Buy Price + Fees into the Scout ROI Calculator and aim for **40%+ ROI** or **$75+ net profit per item**.\n`+
-      `• **Next Step:** Photograph and list any item sitting in your garage before hunting for new inventory.`;
+      `• **Rule #1:** Deal hunting on FB Marketplace, OfferUp, eBay, and Slickdeals happens inside a **45-minute timer**.\n`+
+      `• **Rule #2:** Plug Buy Price + Fees into the Scout ROI Calculator and aim for **40%+ ROI** or **$75+ net profit**.`;
     issued=[{agent:'scout',title:'List 1 item in inventory or run a 25-min timed deal sweep'}];
   } else if(s.includes('diy')||s.includes('home')||s.includes('car')||s.includes('project')){
     const p=state.projects[0];
     reply=`**Wrench DIY Project Guide:**\n`+
-      `Active Project: **${p?p.title:'Home & Auto Maintenance'}** (Estimated savings vs. shop quote: **$${p?p.estSave:150}**).\n\n`+
-      `• **Before picking up a tool:** Confirm every item in the Parts & Tools list is on the workbench so you don't lose 2 hours driving to the hardware/auto store mid-job.\n`+
-      `• Open the Home & Auto tab to launch the exact YouTube tutorial and check off the next step.`;
-    issued=[{agent:'wrench',title:'Verify parts/tools and complete the next step on '+(p?p.title:'active DIY project')}];
+      `Active Project: **${p?p.title:'Home & Auto Maintenance'}** (Estimated savings vs. pro quote: **$${p?p.estSave:150}**).\n\n`+
+      `• Confirm every item in the Parts & Tools list is ready before starting, and use the 1-click YouTube walkthrough on the Home & Auto tab.`;
+    issued=[{agent:'wrench',title:'Complete next step on '+(p?p.title:'active DIY project')}];
   } else if(s.includes('family')||s.includes('sport')||s.includes('kid')||s.includes('wife')){
-    const idea=FAMILY_IDEAS[Math.floor(Math.random()*FAMILY_IDEAS.length)];
+    const ideas=activeFamilyIdeas();
+    const idea=ideas[Math.floor(Math.random()*ideas.length)];
     reply=`**Circle Family & Sports Plan:**\n`+
       `Tonight's recommended bonding activity: **${idea.title}** (${idea.sport} · ${idea.time}).\n`+
       `• *How to run it:* ${idea.note}\n`+
-      `• *With your wife:* Ask her what she's most looking forward to this week over evening tea, and put all phones in the basket at 6:30 PM dinner.`;
+      `• Put all phones in a basket at 6:30 PM dinner.`;
     issued=[{agent:'circle',title:idea.title+' at 4:00 PM'}];
   } else {
     const doneSteps=SLOTS.filter(x=>(state.checks[k]||{})[x.id]).length;
     reply=`**Chief Status Check (${fmtMin(nowMin())}):**\n`+
       `• **Schedule:** ${doneSteps} of ${SLOTS.length} daily blocks completed. Current block: **${n.cur.title}**.\n`+
       `• **Big 3:** ${b.filter(x=>x.t).length?b.map((x,i)=>`#${i+1} ${x.t||'unset'}${x.done?' (Done)':''}`).join(' · '):'Not locked yet—fill in your Big 3 on Today.'}\n`+
-      `• **Discipline:** ${state.focus[k]||0} focus mins logged · ${soc}/${state.budget}m social media budget · ${prot}g protein logged.\n`+
+      `• **Discipline:** ${state.focus[k]||0} focus mins logged · ${soc}/${state.budget}m social budget · ${prot}g/${pTarget}g protein.\n`+
       `• **Next 10 Minutes:** Do the first 5 minutes of *${n.cur.title}* right now.`;
     issued=[{agent:n.cur.agent,title:'Complete current block: '+clip(n.cur.title,55)}];
   }
@@ -447,16 +451,16 @@ function sendChief(text){
 }
 
 function triggerAgentNudge(id){
-  const k=dkey(),prot=state.protein[k]||0,actV=state.ventures.find(v=>v.active)||state.ventures[0];
+  const k=dkey(),prot=state.protein[k]||0,prof=state.profile||{},pTarget=prof.proteinTarget||180;
   const nudges={
     anchor:`Right now is "${slotNow().cur.title}". Set a 25-minute timer, close extra browser tabs, and put your phone face-down across the room.`,
-    spark:`Read this out loud: "${AFFIRMATIONS[Math.floor(Math.random()*AFFIRMATIONS.length)]}" Now take 3 deep breaths and start for just 120 seconds.`,
-    body:`You are at ${prot}g of your 180g protein goal today. Grab 40g of protein (Greek yogurt, cottage cheese, eggs, or shake) and 16oz of water right now.`,
-    ticker:`Check the clock: if it's past ${state.tradeRules.stopTime} AM PT, your edge is gone for the day. Log your morning setups and shift to building your business.`,
-    scout:`Stick to high-margin flips (40%+ ROI). Spend 15 minutes photographing and cross-posting 1 item to FB Marketplace, OfferUp, and eBay before browsing new deals.`,
-    wrench:`Check your active DIY project parts list first. Watch the 5-minute YouTube walkthrough before turning the first wrench so the job finishes clean.`,
-    launch:`Your Google BD superpower is relationship velocity. Message 2 former partners or founders right now with a specific, helpful question.`,
-    circle:`Lock in 4:00 PM sports with your 12yo son and 7yo daughter, and surprise your wife by prepping tonight's high-protein dinner early.`
+    spark:`Read your reaffirmation out loud: "${prof.affirmation||AFFIRMATIONS[0]}" Now take 3 deep breaths and start for just 120 seconds.`,
+    body:`You are at ${prot}g of your ${pTarget}g protein goal today. Grab 40g of protein (Greek yogurt, cottage cheese, eggs, or shake) and 16oz of water right now.`,
+    ticker:`Check the clock: if it's past ${state.tradeRules.stopTime} AM, your morning trade window is closed. Log your setups and shift to building your venture.`,
+    scout:`Stick to high-margin deals (40%+ ROI). Spend 15 minutes photographing and listing 1 item before browsing new deals.`,
+    wrench:`Check your active DIY project parts list first. Watch the 5-minute YouTube walkthrough before turning the first wrench.`,
+    launch:`Leverage your background (${prof.careerBackground||'your network'}). Message 2 contacts or leads right now with a specific, helpful offer.`,
+    circle:`Lock in 4:00 PM (${(prof.favoriteSports||['sports'])[0]}) with ${prof.kidsDesc||prof.spouseName||'your family'}, and prep tonight's high-protein dinner early.`
   };
   state.nudges[id]={t:nudges[id]||'Stay locked on your next 10-minute action.',ts:Date.now()};
   save();render();
@@ -467,7 +471,8 @@ function triggerAgentNudge(id){
 let breathInterval=null;
 function openMorningModal(){
   const k=dkey(),m=state.morningDone[k]||{aff:false,ref:'',breath:false};
-  const aff=AFFIRMATIONS[new Date().getDate()%AFFIRMATIONS.length];
+  const prof=state.profile||{};
+  const aff=prof.affirmation||AFFIRMATIONS[new Date().getDate()%AFFIRMATIONS.length];
   const refQ=REFLECTIONS[new Date().getDate()%REFLECTIONS.length];
   const b=getBig3(k);
   const root=$('#modalRoot');
@@ -477,7 +482,7 @@ function openMorningModal(){
         <div class="hd">
           <div>
             <p class="eyebrow">Spark · Forced Morning Ritual</p>
-            <h2 id="mTitle">Palm Springs Morning Ignition</h2>
+            <h2 id="mTitle">${esc(prof.name?prof.name+'’s ':'')}Morning Ignition</h2>
           </div>
           <button class="btn sm" data-act="close-modal">Close</button>
         </div>
@@ -494,7 +499,7 @@ function openMorningModal(){
           <div class="hd">
             <div>
               <p class="eyebrow">Step 2 · 60-Second Box Breathing &amp; Posture Reset</p>
-              <p class="hint small">Inhale 4s · Hold 4s · Exhale 4s — calm the ADHD nervous system.</p>
+              <p class="hint small">Inhale 4s · Hold 4s · Exhale 4s — calm the nervous system.</p>
             </div>
             <button class="btn sm solid" type="button" id="startBreathBtn">${m.breath?'Completed ✓':'Start 60s Breath'}</button>
           </div>
@@ -507,7 +512,7 @@ function openMorningModal(){
         </div>
         <div class="card">
           <label class="lab" for="mB1">Step 4 · Today’s #1 Income / Venture Priority (Big 3 #1)</label>
-          <input type="text" id="mB1" value="${esc(b[0].t)}" placeholder="e.g., Message 5 Google BD contacts &amp; list 2 reseller flips">
+          <input type="text" id="mB1" value="${esc(b[0].t)}" placeholder="e.g., Message 5 partners &amp; ship next milestone">
         </div>
         <div class="row" style="justify-content:flex-end">
           <button class="btn solid" type="button" id="lockMorningBtn">Lock In My Morning &amp; Start Day</button>
@@ -552,4 +557,367 @@ function openMorningModal(){
     toast('Morning Ignition locked! Chief updated your Today dashboard.');
     render();
   };
+}
+
+/* ---------- 6-Module Onboarding & Personalization Wizard ---------- */
+let wizStep=1;
+let wizDraft=null;
+
+function openOnboardingModal(startAt){
+  wizStep=startAt||1;
+  const p=state.profile||{};
+  wizDraft={
+    name:p.name||'',
+    age:p.age||'',
+    gender:p.gender||'',
+    city:p.city||'',
+    wakeTime:p.wakeTime||'06:30',
+    bedTime:p.bedTime||'22:00',
+    programPack:p.programPack||'ADHD Focus & Structure',
+    weightLbs:p.weightLbs||'',
+    goalWeightLbs:p.goalWeightLbs||'',
+    proteinTarget:p.proteinTarget||160,
+    waterTarget:p.waterTarget||10,
+    workoutStyle:p.workoutStyle||'Strength & Conditioning',
+    dietStyle:p.dietStyle||'High-Protein Whole Foods',
+    favoriteDishes:Array.isArray(p.favoriteDishes)?p.favoriteDishes.slice():['r1','r3','r4','r6'],
+    customDishes:Array.isArray(p.customDishes)?JSON.parse(JSON.stringify(p.customDishes)):[],
+    careerBackground:p.careerBackground||'',
+    venture1:(state.ventures[0]&&state.ventures[0].name)||'',
+    venture1Next:(state.ventures[0]&&state.ventures[0].next)||'',
+    venture2:(state.ventures[1]&&state.ventures[1].name)||'',
+    morningTrader:p.morningTrader!==false,
+    tickers:state.watchlist.map(w=>w.sym).join(', ')||'SPY, NVDA, GOOGL',
+    resellerLicense:!!p.resellerLicense,
+    hunt1:(state.hunts[0]&&state.hunts[0].item)||'',
+    hunt1Max:(state.hunts[0]&&state.hunts[0].maxBuy)||'',
+    spouseName:p.spouseName||'',
+    kidsDesc:p.kidsDesc||'',
+    favoriteSports:Array.isArray(p.favoriteSports)?p.favoriteSports.slice():['Pickleball','Golf'],
+    diyTitle:(state.projects[0]&&state.projects[0].title)||'',
+    diyParts:(state.projects[0]&&state.projects[0].parts)||'',
+    affirmation:p.affirmation||AFFIRMATIONS[0]
+  };
+  paintOnboardingModal();
+}
+
+function captureWizInputs(){
+  if(!wizDraft)return;
+  const root=$('#modalRoot');if(!root)return;
+  root.querySelectorAll('[data-wiz]').forEach(el=>{
+    const k=el.dataset.wiz;
+    if(el.type==='checkbox')wizDraft[k]=el.checked;
+    else wizDraft[k]=el.value;
+  });
+}
+
+function paintOnboardingModal(){
+  const d=wizDraft,root=$('#modalRoot');
+  const stepsBar=[1,2,3,4,5,6].map(i=>`<i class="${i<wizStep?'done':i===wizStep?'on':''}"></i>`).join('');
+  let body='';
+
+  if(wizStep===1){
+    body=`
+      <p class="eyebrow">Module 1 of 6 · Demographics &amp; Focus Program</p>
+      <h2>Welcome! Let’s tailor Steady to your life</h2>
+      <p class="hint">Your answers configure your Chief of Staff, daily schedule, workouts, and agent guardrails. All data stays private to your account (${esc(currentUser?currentUser.email:'')}).</p>
+      <div class="grid-2 equal" style="gap:10px">
+        <div><label class="lab">Your First Name</label><input type="text" data-wiz="name" value="${esc(d.name)}" placeholder="e.g., Matt"></div>
+        <div><label class="lab">City / Location</label><input type="text" data-wiz="city" value="${esc(d.city)}" placeholder="e.g., Palm Springs, CA"></div>
+      </div>
+      <div class="grid-2 equal" style="gap:10px">
+        <div><label class="lab">Age</label><input type="number" data-wiz="age" value="${esc(d.age)}" placeholder="e.g., 41"></div>
+        <div><label class="lab">Gender</label><input type="text" data-wiz="gender" value="${esc(d.gender)}" placeholder="e.g., Male / Female"></div>
+      </div>
+      <div class="grid-2 equal" style="gap:10px">
+        <div><label class="lab">Target Wake Time</label><input type="time" data-wiz="wakeTime" value="${esc(d.wakeTime)}"></div>
+        <div><label class="lab">Target Bedtime</label><input type="time" data-wiz="bedTime" value="${esc(d.bedTime)}"></div>
+      </div>
+      <div>
+        <label class="lab">Primary Mental Health &amp; Life-Ops Program Pack</label>
+        <select data-wiz="programPack">
+          ${PROGRAM_PACKS.map(pk=>`<option value="${esc(pk.id)}" ${d.programPack===pk.id?'selected':''}>${esc(pk.id)} — ${esc(clip(pk.desc,65))}</option>`).join('')}
+        </select>
+      </div>`;
+  } else if(wizStep===2){
+    body=`
+      <p class="eyebrow">Module 2 of 6 · Body, Exercise &amp; Nutrition Targets</p>
+      <h2>Configure Your Body Agent</h2>
+      <p class="hint">Body uses your demographics to set your daily protein target, hydration goal, and daily forced workout routine.</p>
+      <div class="grid-2 equal" style="gap:10px">
+        <div><label class="lab">Current Weight (lbs)</label><input type="number" id="wizWeight" data-wiz="weightLbs" value="${esc(d.weightLbs)}" placeholder="e.g., 190"></div>
+        <div><label class="lab">Goal Weight (lbs)</label><input type="number" id="wizGoalWeight" data-wiz="goalWeightLbs" value="${esc(d.goalWeightLbs)}" placeholder="e.g., 180"></div>
+      </div>
+      <div class="grid-2 equal" style="gap:10px">
+        <div>
+          <label class="lab">Daily Protein Target (grams)</label>
+          <div class="inline">
+            <input type="number" id="wizProt" data-wiz="proteinTarget" value="${esc(d.proteinTarget)}">
+            <button class="btn sm" type="button" id="calcProtBtn">1g / lb Goal</button>
+          </div>
+        </div>
+        <div><label class="lab">Daily Water Target (Glasses)</label><input type="number" data-wiz="waterTarget" value="${esc(d.waterTarget)}"></div>
+      </div>
+      <div class="grid-2 equal" style="gap:10px">
+        <div>
+          <label class="lab">Preferred Workout Style</label>
+          <select data-wiz="workoutStyle">
+            ${['Desert Strength & Court Conditioning','Strength & Lifting (Gym / Dumbbells)','Court Sports & Cardio Agility','HIIT & Bodyweight Conditioning','Low-Impact Mobility & Walking'].map(s=>`<option ${d.workoutStyle===s?'selected':''}>${esc(s)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="lab">Dietary Approach</label>
+          <select data-wiz="dietStyle">
+            ${['High-Protein Whole Foods','High-Protein Mediterranean','Low-Carb / Keto High-Protein','Dairy-Light High-Protein','Family-Friendly High-Protein'].map(s=>`<option ${d.dietStyle===s?'selected':''}>${esc(s)}</option>`).join('')}
+          </select>
+        </div>
+      </div>`;
+  } else if(wizStep===3){
+    const allRecs=RECIPES.concat(d.customDishes||[]);
+    body=`
+      <p class="eyebrow">Module 3 of 6 · Favorite High-Protein Dishes &amp; Recipes</p>
+      <h2>Pick Your Favorite Dishes for Weekly Meal Plans</h2>
+      <p class="hint">Tap the dishes you love (or add your own below). Body will build your weekly meal plan and aisle-sorted grocery shopping list from these.</p>
+      <div class="chips">
+        ${allRecs.map(r=>{
+          const sel=d.favoriteDishes.indexOf(r.id)>=0;
+          return `<button type="button" class="chip ${sel?'sel':''}" data-wiz-dish="${r.id}">${sel?'✓ ':''}${esc(r.name)} (${r.protein}g)</button>`;
+        }).join('')}
+      </div>
+      <div class="card soft">
+        <span class="lab">Add Your Own Favorite Dish / Family Recipe</span>
+        <div class="grid-2 equal" style="gap:8px">
+          <input type="text" id="custDishName" placeholder="Dish name (e.g., Grilled Ribeye &amp; Asparagus)">
+          <input type="number" id="custDishProt" placeholder="Protein grams (e.g., 55)">
+        </div>
+        <div class="inline">
+          <input type="text" id="custDishIngs" placeholder="Ingredients (comma-separated: Ribeye steak, Asparagus, Garlic)">
+          <button class="btn sm solid" type="button" id="addCustDishBtn">Add Dish</button>
+        </div>
+      </div>`;
+  } else if(wizStep===4){
+    body=`
+      <p class="eyebrow">Module 4 of 6 · Business Ideas, Career, Markets &amp; Deals</p>
+      <h2>Configure Launch, Ticker &amp; Scout Agents</h2>
+      <div>
+        <label class="lab">Your Career Background / Unfair Advantage</label>
+        <input type="text" data-wiz="careerBackground" value="${esc(d.careerBackground)}" placeholder="e.g., Ex-Google Business Development, Sales &amp; Partnerships">
+      </div>
+      <div class="grid-2 equal" style="gap:10px">
+        <div><label class="lab">#1 Active Business Idea / Venture</label><input type="text" data-wiz="venture1" value="${esc(d.venture1)}" placeholder="e.g., AI Life-Ops App / Consulting"></div>
+        <div><label class="lab">First Next Action for #1 Venture</label><input type="text" data-wiz="venture1Next" value="${esc(d.venture1Next)}" placeholder="e.g., Message 5 warm contacts this week"></div>
+      </div>
+      <div>
+        <label class="lab">Secondary Business Idea (Parked until #1 launches)</label>
+        <input type="text" data-wiz="venture2" value="${esc(d.venture2)}" placeholder="e.g., Fractional BD Advisory or Reseller Brand">
+      </div>
+      <div class="grid-2 equal" style="gap:10px">
+        <div class="card soft">
+          <label class="row" style="cursor:pointer">
+            <input type="checkbox" data-wiz="morningTrader" ${d.morningTrader?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)">
+            <span><b>I trade stocks in the morning</b></span>
+          </label>
+          <label class="lab">Watchlist Tickers (comma-separated)</label>
+          <input type="text" data-wiz="tickers" value="${esc(d.tickers)}" placeholder="GOOGL, NVDA, SPY">
+        </div>
+        <div class="card soft">
+          <label class="row" style="cursor:pointer">
+            <input type="checkbox" data-wiz="resellerLicense" ${d.resellerLicense?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)">
+            <span><b>I hunt deals / resell products</b></span>
+          </label>
+          <label class="lab">First Product to Hunt on Marketplaces</label>
+          <div class="inline">
+            <input type="text" data-wiz="hunt1" value="${esc(d.hunt1)}" placeholder="e.g., Espresso Machine">
+            <input type="number" data-wiz="hunt1Max" value="${esc(d.hunt1Max)}" placeholder="Max $" style="max-width:95px">
+          </div>
+        </div>
+      </div>`;
+  } else if(wizStep===5){
+    body=`
+      <p class="eyebrow">Module 5 of 6 · Family, Relationships &amp; Favorite Activities</p>
+      <h2>Configure Your Circle Agent</h2>
+      <p class="hint">Circle helps you plan meaningful family bonding, partner connection, and sports sessions every afternoon and weekend.</p>
+      <div class="grid-2 equal" style="gap:10px">
+        <div><label class="lab">Partner / Spouse (Optional)</label><input type="text" data-wiz="spouseName" value="${esc(d.spouseName)}" placeholder="e.g., Wife (from Latvia)"></div>
+        <div><label class="lab">Kids / Family Members (Optional)</label><input type="text" data-wiz="kidsDesc" value="${esc(d.kidsDesc)}" placeholder="e.g., Son (12) &amp; Daughter (7)"></div>
+      </div>
+      <div>
+        <label class="lab">Tap Your Favorite Sports &amp; Bonding Activities</label>
+        <div class="chips">
+          ${ALL_SPORTS.map(sp=>{
+            const sel=d.favoriteSports.indexOf(sp)>=0;
+            return `<button type="button" class="chip ${sel?'sel':''}" data-wiz-sport="${esc(sp)}">${sel?'✓ ':''}${esc(sp)}</button>`;
+          }).join('')}
+        </div>
+      </div>`;
+  } else {
+    body=`
+      <p class="eyebrow">Module 6 of 6 · Home/Auto DIY, Reaffirmation &amp; App Connectors</p>
+      <h2>Final Touches: Wrench, Spark &amp; Connected Apps</h2>
+      <div class="grid-2 equal" style="gap:10px">
+        <div><label class="lab">Current Home or Auto DIY Project</label><input type="text" data-wiz="diyTitle" value="${esc(d.diyTitle)}" placeholder="e.g., SUV Oil &amp; Filter Service or AC Tune-Up"></div>
+        <div><label class="lab">Tools / Parts Needed</label><input type="text" data-wiz="diyParts" value="${esc(d.diyParts)}" placeholder="e.g., 6qt 0W-20 oil, filter, 14mm socket"></div>
+      </div>
+      <div>
+        <label class="lab">Your Personal Morning Reaffirmation (Read Aloud at Wake-Up)</label>
+        <input type="text" data-wiz="affirmation" value="${esc(d.affirmation)}" placeholder="I am a builder, a present parent and partner, and I finish what I start today.">
+      </div>
+      <div class="card soft">
+        <span class="lab">App Connectors (Google Calendar, Sheets, Docs, Gmail, Apple Messages, WhatsApp, Facebook)</span>
+        <p class="hint small">As a new user, your app connectors start clean and unlinked. Whenever an agent needs to read, write, or modify an external service—or inside the <b>Integrations</b> tab—you’ll be prompted to link your own account.</p>
+      </div>`;
+  }
+
+  root.innerHTML=`
+    <div class="modal-backdrop">
+      <div class="modal" role="dialog" aria-modal="true">
+        <div class="wiz-steps">${stepsBar}</div>
+        ${body}
+        <div class="row" style="justify-content:space-between;margin-top:6px">
+          <div>
+            ${wizStep>1?`<button class="btn" type="button" id="wizPrevBtn">← Back</button>`:`<button class="btn link" type="button" data-act="close-modal">Skip for now</button>`}
+          </div>
+          <div class="row">
+            ${wizStep<6?`<button class="btn solid" type="button" id="wizNextBtn">Next Module (${wizStep}/6) →</button>`:`<button class="btn solid" type="button" id="wizFinishBtn">Finish &amp; Launch My Steady OS ✓</button>`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const prev=$('#wizPrevBtn');
+  if(prev)prev.onclick=()=>{captureWizInputs();wizStep--;paintOnboardingModal();};
+  const next=$('#wizNextBtn');
+  if(next)next.onclick=()=>{captureWizInputs();wizStep++;paintOnboardingModal();};
+  const fin=$('#wizFinishBtn');
+  if(fin)fin.onclick=()=>{captureWizInputs();applyOnboardingWizard();};
+
+  const calcBtn=$('#calcProtBtn');
+  if(calcBtn)calcBtn.onclick=()=>{
+    captureWizInputs();
+    const w=+(wizDraft.goalWeightLbs||wizDraft.weightLbs||175);
+    wizDraft.proteinTarget=Math.max(100,Math.min(300,Math.round(w)));
+    paintOnboardingModal();
+  };
+
+  root.querySelectorAll('[data-wiz-dish]').forEach(btn=>{
+    btn.onclick=()=>{
+      captureWizInputs();
+      const id=btn.dataset.wizDish;
+      const idx=wizDraft.favoriteDishes.indexOf(id);
+      if(idx>=0)wizDraft.favoriteDishes.splice(idx,1);
+      else wizDraft.favoriteDishes.push(id);
+      paintOnboardingModal();
+    };
+  });
+
+  const addDishBtn=$('#addCustDishBtn');
+  if(addDishBtn)addDishBtn.onclick=()=>{
+    captureWizInputs();
+    const nm=$('#custDishName').value.trim();
+    const pr=+$('#custDishProt').value||45;
+    const ingStr=$('#custDishIngs').value.trim();
+    if(!nm){toast('Enter a dish name first.');return;}
+    const id='cust_'+rid();
+    const ings=(ingStr?ingStr.split(','):[nm]).map(x=>({item:x.trim(),cat:'Meat & Seafood'})).filter(x=>x.item);
+    const dish={id,name:nm,slot:'Custom Favorite',protein:pr,cals:pr*10,prep:'15 min',ingredients:ings,steps:'Custom favorite high-protein recipe.'};
+    wizDraft.customDishes.push(dish);
+    wizDraft.favoriteDishes.push(id);
+    paintOnboardingModal();
+    toast('Added '+nm+' to your favorite dishes!');
+  };
+
+  root.querySelectorAll('[data-wiz-sport]').forEach(btn=>{
+    btn.onclick=()=>{
+      captureWizInputs();
+      const sp=btn.dataset.wizSport;
+      const idx=wizDraft.favoriteSports.indexOf(sp);
+      if(idx>=0)wizDraft.favoriteSports.splice(idx,1);
+      else wizDraft.favoriteSports.push(sp);
+      paintOnboardingModal();
+    };
+  });
+}
+
+function applyOnboardingWizard(){
+  const d=wizDraft;if(!d)return;
+  const p=state.profile;
+  p.name=d.name.trim()||(currentUser?currentUser.name:'Friend');
+  p.age=d.age;
+  p.gender=d.gender.trim();
+  p.city=d.city.trim();
+  p.wakeTime=d.wakeTime||'06:30';
+  p.bedTime=d.bedTime||'22:00';
+  p.programPack=d.programPack;
+  p.weightLbs=d.weightLbs;
+  p.goalWeightLbs=d.goalWeightLbs;
+  p.proteinTarget=+d.proteinTarget||160;
+  p.waterTarget=+d.waterTarget||8;
+  p.workoutStyle=d.workoutStyle;
+  p.dietStyle=d.dietStyle;
+  p.favoriteDishes=d.favoriteDishes.length?d.favoriteDishes:['r1','r3','r4'];
+  p.customDishes=d.customDishes||[];
+  p.careerBackground=d.careerBackground.trim();
+  p.morningTrader=!!d.morningTrader;
+  p.resellerLicense=!!d.resellerLicense;
+  p.spouseName=d.spouseName.trim();
+  p.kidsDesc=d.kidsDesc.trim();
+  p.favoriteSports=d.favoriteSports.length?d.favoriteSports:['Pickleball'];
+  p.affirmation=d.affirmation.trim()||AFFIRMATIONS[0];
+  p.onboarded=true;
+
+  state.shift=Math.max(-90,Math.min(180,mins(p.wakeTime)-mins('06:00')));
+
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  days.forEach((day,i)=>{
+    state.mealPlan[day]=p.favoriteDishes[i%p.favoriteDishes.length];
+  });
+
+  if(d.venture1.trim()){
+    if(state.ventures.length){
+      state.ventures[0].name=d.venture1.trim();
+      state.ventures[0].next=d.venture1Next.trim()||'Complete 3 validation conversations this week';
+      state.ventures[0].active=true;
+    } else {
+      state.ventures.push({id:rid(),name:d.venture1.trim(),stage:1,next:d.venture1Next.trim()||'Complete 3 validation conversations this week',active:true});
+    }
+  }
+  if(d.venture2.trim()&&state.ventures.length<2){
+    state.ventures.push({id:rid(),name:d.venture2.trim(),stage:0,next:'Parked until active venture reaches revenue',active:false});
+  }
+
+  if(d.tickers.trim()){
+    const syms=d.tickers.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
+    if(syms.length){
+      state.watchlist=syms.map(sym=>({id:rid(),sym,bias:'Watch',level:'Opening 15-min range',note:'Added during personalization setup.'}));
+    }
+  }
+
+  if(d.hunt1.trim()&&!state.hunts.length){
+    state.hunts.push({id:rid(),item:d.hunt1.trim(),maxBuy:+d.hunt1Max||250,estSell:(+d.hunt1Max||250)*1.8,purpose:p.resellerLicense?'Resell Flip':'Personal Deal'});
+  }
+
+  if(d.diyTitle.trim()&&!state.projects.length){
+    state.projects.push({
+      id:rid(),title:d.diyTitle.trim(),cat:'Home / Auto DIY',
+      ytQuery:d.diyTitle.trim()+' DIY step by step',estSave:175,
+      parts:d.diyParts.trim()||'Basic hand tools & replacement part',
+      steps:[
+        {t:'Verify all tools and replacement parts before starting',done:false},
+        {t:'Watch 5-minute YouTube tutorial walkthrough',done:false},
+        {t:'Complete installation & test operation',done:false}
+      ]
+    });
+  }
+
+  if(currentUser){
+    currentUser.name=p.name;
+    const accs=loadAccounts();
+    if(accs[currentUser.email]){accs[currentUser.email].name=p.name;saveAccounts(accs);}
+  }
+
+  save();
+  $('#modalRoot').innerHTML='';
+  updateUserChip();
+  render();
+  toast('Your Steady OS is personalized and ready!');
 }
