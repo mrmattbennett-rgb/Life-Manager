@@ -162,7 +162,7 @@ function openSlotMenuModal(slotId){
   const shareTitle=(rendered?rendered.title:raw.title);
   const shareDetail=(rendered?rendered.detail:raw.detail);
   const shareSummary=`${shareTitle} (${fmtMin(stMin)} · ${fmtFreq(draftDays,raw.specificDate)}) — ${shareDetail}`;
-  const gcalUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('[Steady] '+shareTitle)}&details=${encodeURIComponent(shareDetail)}&dates=${gcalDates}`;
+  const gcalUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('[Life Lock In] '+shareTitle)}&details=${encodeURIComponent(shareDetail)}&dates=${gcalDates}`;
 
   function paintSlotModal(){
     const root=$('#modalRoot');
@@ -393,7 +393,7 @@ function openBlockTimeModal(){
             </div>
             <button class="btn sm" type="button" data-act="close-modal">Close</button>
           </div>
-          <p class="hint">Block out time for doctor appointments, kids’ school events, errands, golf tee times, or personal commitments outside the app. Steady will automatically shift overlapping blocks around your obligation.</p>
+          <p class="hint">Block out time for doctor appointments, kids’ school events, errands, golf tee times, or personal commitments outside the app. Life Lock In will automatically shift overlapping blocks around your obligation.</p>
           <div class="card sun">
             <div>
               <label class="lab" for="obTitle">Obligation / Appointment Name</label>
@@ -513,19 +513,19 @@ function finishFocus(done){
 /* ---------- Calendar (.ics & CSV) Export ---------- */
 function exportIcs(){
   const d=new Date(),ymd=d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
-  let ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Steady//Chief of Staff OS//EN'];
+  let ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Life Lock In//Chief of Staff OS//EN'];
   const list=buildDaySchedule(selectedDayIdx);
   list.forEach((s,i)=>{
     const st=slotMin(s),en=s.dur?(st+s.dur):(i<list.length-1?slotMin(list[i+1]):st+30);
     const sh=pad(Math.floor(st/60)),sm=pad(st%60),eh=pad(Math.floor(en/60)),em=pad(en%60);
-    const agName=(AG[s.agent]&&AG[s.agent].name)||'Steady';
+    const agName=(AG[s.agent]&&AG[s.agent].name)||'Life Lock In';
     ics.push('BEGIN:VEVENT','DTSTART:'+ymd+'T'+sh+sm+'00','DTEND:'+ymd+'T'+eh+em+'00','SUMMARY:['+agName+'] '+s.title,'DESCRIPTION:'+s.detail.replace(/\n/g,' '),'END:VEVENT');
   });
   ics.push('END:VCALENDAR');
   const blob=new Blob([ics.join('\r\n')],{type:'text/calendar;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='steady-schedule-'+DAY_NAMES[selectedDayIdx]+'-'+dkey()+'.ics';
+  a.download='lifelockin-schedule-'+DAY_NAMES[selectedDayIdx]+'-'+dkey()+'.ics';
   a.click();
   toast('Downloaded .ics file for '+DAY_NAMES[selectedDayIdx]+' — opens in iPhone/Mac or Google Calendar.');
 }
@@ -705,7 +705,7 @@ function executeAgentAction(svcId,agentId,op,actionKey){
     }
     case 'gdocs_reflection':{
       const m=state.morningDone[k]||{},b=getBig3(k);
-      const doc=`# Steady Daily Reflection & Executive Brief (${k} · ${prof.name||'Owner'})\n`+
+      const doc=`# Life Lock In Daily Reflection & Executive Brief (${k} · ${prof.name||'Owner'})\n`+
         `Reaffirmation Completed: ${m.aff?'Yes':'Pending'}\n`+
         `Morning Self-Reflection: ${m.ref||'(Not entered yet)'}\n`+
         `Big 3 Outcomes:\n1. ${b[0].t||'Unset'}\n2. ${b[1].t||'Unset'}\n3. ${b[2].t||'Unset'}\n`+
@@ -758,7 +758,7 @@ function executeAgentAction(svcId,agentId,op,actionKey){
     case 'imessage_wife':{
       const phone=(c.account||'').replace(/[^\d+]/g,'');
       const r=recs.find(x=>x.id===state.mealPlan[['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]])||recs[0];
-      const txt=`Hey ❤️ Checking in from my Steady dashboard — planning ${r.name} (${r.protein}g protein) for dinner tonight and 4:00 PM family time. Need anything while I'm out?`;
+      const txt=`Hey ❤️ Checking in from my Life Lock In dashboard — planning ${r.name} (${r.protein}g protein) for dinner tonight and 4:00 PM family time. Need anything while I'm out?`;
       logSync('circle','imessage','WRITE',`Circle prepared iMessage check-in to ${prof.spouseName||'partner'} with tonight's dinner (${r.name}).`);
       window.location.href=`sms:${phone}?&body=${encodeURIComponent(txt)}`;
       render();
@@ -845,7 +845,7 @@ function buildChiefReply(qText){
 
   let reply='',issued=[];
   if(s.includes('morning')||s.includes('brief')){
-    reply=`Good morning${prof.name?', '+prof.name:''}${prof.city?' in '+prof.city:''}. Here is your Chief of Staff gameplan (${prof.programPack||'Steady OS'}):\n\n`+
+    reply=`Good morning${prof.name?', '+prof.name:''}${prof.city?' in '+prof.city:''}. Here is your Chief of Staff gameplan (${prof.programPack||'Life Lock In OS'}):\n\n`+
       `1. **Mindset & Body (Spark + Body):** Complete your Morning Ignition Gate if you haven't yet. Target **${pTarget}g+ protein** today (currently ${prot}g) and complete your **${prof.workoutStyle||'daily workout'}**.\n`+
       `2. **Morning Market Window (Ticker):** You have a hard stop at **${state.tradeRules.stopTime} AM** and a max of ${state.tradeRules.maxTrades} setups. Protect your focus for your 9:00 AM revenue block.\n`+
       `3. **Income & Ventures (Launch + Scout):** Active venture is **${actV?actV.name:'your primary project'}**. Your #1 move at 9:00 AM: *${actV?actV.next:'Complete 3 high-value outreach conversations'}*.\n`+
@@ -1083,7 +1083,7 @@ function paintOnboardingModal(){
   if(wizStep===1){
     body=`
       <p class="eyebrow">Module 1 of 6 · Demographics &amp; Focus Program</p>
-      <h2>Welcome! Let’s tailor Steady to your life</h2>
+      <h2>Welcome! Let’s tailor Life Lock In to your life</h2>
       <p class="hint">Your answers configure your Chief of Staff, daily schedule, workouts, and agent guardrails. All data stays private to your account (${esc(currentUser?currentUser.email:'')}).</p>
       <div class="grid-2 equal" style="gap:10px">
         <div><label class="lab">Your First Name</label><input type="text" data-wiz="name" value="${esc(d.name)}" placeholder="e.g., Matt"></div>
@@ -1242,7 +1242,7 @@ function paintOnboardingModal(){
             ${wizStep>1?`<button class="btn" type="button" id="wizPrevBtn">← Back</button>`:`<button class="btn link" type="button" data-act="close-modal">Skip for now</button>`}
           </div>
           <div class="row">
-            ${wizStep<6?`<button class="btn solid" type="button" id="wizNextBtn">Next Module (${wizStep}/6) →</button>`:`<button class="btn solid" type="button" id="wizFinishBtn">Finish &amp; Launch My Steady OS ✓</button>`}
+            ${wizStep<6?`<button class="btn solid" type="button" id="wizNextBtn">Next Module (${wizStep}/6) →</button>`:`<button class="btn solid" type="button" id="wizFinishBtn">Finish &amp; Launch My Life Lock In OS ✓</button>`}
           </div>
         </div>
       </div>
@@ -1390,5 +1390,5 @@ function applyOnboardingWizard(){
   $('#modalRoot').innerHTML='';
   updateUserChip();
   render();
-  toast('Your Steady OS is personalized and ready!');
+  toast('Your Life Lock In OS is personalized and ready!');
 }
