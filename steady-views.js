@@ -495,12 +495,6 @@ function viewToday(){
     </header>
     ${guideBanner}
     ${morningGateBanner}
-    ${domainIntegrationsBar('anchor',[
-      {svc:'gcalendar',op:'WRITE',key:'gcal_push_now',label:'Google Calendar: Push Current Block'},
-      {svc:'gcalendar',op:'MODIFY',key:'gcal_modify_shift',label:'Google Calendar: Sync Shifted Schedule'},
-      {svc:'gdocs',op:'WRITE',key:'gdocs_reflection',label:'Google Docs: Append Morning Reflection'},
-      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Partner & Dinner Check-In'}
-    ])}
     <div class="grid-2">
       <div class="stack">${nowCard}${big3Card}${pulseMetrics}${timelineCard}</div>
       <div class="stack">${chiefCard}${focusAndParking}${tasksAndWins}</div>
@@ -1021,6 +1015,12 @@ function viewConnect(){
       </div>
     </header>
     <p class="lede">Grant or revoke granular <b>READ</b>, <b>WRITE</b>, and <b>MODIFY</b> permissions per app so your Chief of Staff and 8 specialist agents can read schedules/alerts, write docs/sheets/messages, and modify calendars or inventory on your behalf.</p>
+    ${domainIntegrationsBar('anchor',[
+      {svc:'gcalendar',op:'WRITE',key:'gcal_push_now',label:'Google Calendar: Push Current Block'},
+      {svc:'gcalendar',op:'MODIFY',key:'gcal_modify_shift',label:'Google Calendar: Sync Shifted Schedule'},
+      {svc:'gdocs',op:'WRITE',key:'gdocs_reflection',label:'Google Docs: Append Morning Reflection'},
+      {svc:'imessage',op:'WRITE',key:'imessage_wife',label:'Apple Messages: Partner & Dinner Check-In'}
+    ])}
     <div class="grid-2">
       <div class="stack">
         ${INTEGRATIONS.map(svc=>{
