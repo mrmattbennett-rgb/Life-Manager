@@ -43,7 +43,7 @@ function renderAuthScreen(){
     formHtml=`
       <div>
         <p class="eyebrow">Private Multi-User Life OS</p>
-        <h1 style="margin-top:4px">Sign in to Steady</h1>
+        <h1 style="margin-top:4px">Sign in to Life Lock In</h1>
         <p class="hint">Each account keeps its own private data, app integrations, meal plan, ventures, and preferences.</p>
       </div>
       <form class="stack" id="loginForm" style="gap:12px">
@@ -62,7 +62,7 @@ function renderAuthScreen(){
       </form>
       <div class="sec">
         <div class="hd">
-          <span class="hint small">New to Steady? Start fresh with guided setup:</span>
+          <span class="hint small">New to Life Lock In? Start fresh with guided setup:</span>
           <button class="btn sm sun" type="button" id="goSignupBtn">Create New Account</button>
         </div>
       </div>
@@ -130,8 +130,8 @@ function renderAuthScreen(){
           <p class="small"><b>Recovery Email Prepared for ${esc(resetState.email)}</b></p>
           <p class="hint small">In this browser-hosted app, your 6-digit recovery token is <b class="mono">${esc(resetState.code)}</b>. You can also dispatch it to your inbox below:</p>
           <div class="row">
-            <a class="btn sm" href="mailto:${encodeURIComponent(resetState.email)}?subject=${encodeURIComponent('Steady Password Reset Code: '+resetState.code)}&body=${encodeURIComponent('Your Steady OS 6-digit password reset code is: '+resetState.code)}">Open in Apple Mail ↗</a>
-            <a class="btn sm" href="https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(resetState.email)}&su=${encodeURIComponent('Steady Password Reset Code: '+resetState.code)}&body=${encodeURIComponent('Your Steady OS 6-digit password reset code is: '+resetState.code)}" target="_blank" rel="noopener">Send via Gmail ↗</a>
+            <a class="btn sm" href="mailto:${encodeURIComponent(resetState.email)}?subject=${encodeURIComponent('Life Lock In Password Reset Code: '+resetState.code)}&body=${encodeURIComponent('Your Life Lock In OS 6-digit password reset code is: '+resetState.code)}">Open in Apple Mail ↗</a>
+            <a class="btn sm" href="https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(resetState.email)}&su=${encodeURIComponent('Life Lock In Password Reset Code: '+resetState.code)}&body=${encodeURIComponent('Your Life Lock In OS 6-digit password reset code is: '+resetState.code)}" target="_blank" rel="noopener">Send via Gmail ↗</a>
           </div>
         </div>
         <form class="stack" id="resetConfirmForm" style="gap:10px">
@@ -154,9 +154,38 @@ function renderAuthScreen(){
   root.innerHTML=`
     <div class="auth-wrap">
       <div class="auth-card">
-        <div class="brand">
-          <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="13" r="8" fill="var(--sun)"/><rect x="3" y="21" width="26" height="3.5" rx="1.75" fill="var(--accent)"/><rect x="8" y="26.5" width="16" height="2.5" rx="1.25" fill="var(--accent)" opacity=".55"/></svg>
-          <div><b>Steady</b><small>Chief of Staff &amp; Life OS</small></div>
+        <div class="auth-lockup">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <defs>
+              <linearGradient id="authCoralSlate" x1="20%" y1="10%" x2="85%" y2="85%">
+                <stop offset="0%" stop-color="#F08B6D"/>
+                <stop offset="55%" stop-color="#E87A5D"/>
+                <stop offset="100%" stop-color="#5B677A"/>
+              </linearGradient>
+              <linearGradient id="authWarmCoral" x1="15%" y1="0%" x2="80%" y2="95%">
+                <stop offset="0%" stop-color="#F28E71"/>
+                <stop offset="65%" stop-color="#E87A5D"/>
+                <stop offset="100%" stop-color="#B56A63"/>
+              </linearGradient>
+              <linearGradient id="authSlateBlue" x1="25%" y1="15%" x2="85%" y2="95%">
+                <stop offset="0%" stop-color="#8C6D68"/>
+                <stop offset="45%" stop-color="#58677B"/>
+                <stop offset="100%" stop-color="#4A607A"/>
+              </linearGradient>
+            </defs>
+            <path d="M126 39 C139 43 151 48 161 53 C162 72 160 91 154 108" fill="none" stroke="url(#authSlateBlue)" stroke-width="11.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M62 46 C53 49 45 51 39 54 C38 86 45 117 65 137 C83 153 113 149 126 128 C135 114 132 94 118 83" fill="none" stroke="url(#authCoralSlate)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M124 72 C124 47 121 25 100 25 C79 25 75 48 75 72 C75 96 61 112 76 129" fill="none" stroke="url(#authWarmCoral)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M68 96 C73 74 97 64 119 72 C141 80 151 106 141 131 C134 147 121 159 106 167" fill="none" stroke="url(#authSlateBlue)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M63 151 C72 162 82 171 93 178" fill="none" stroke="#4A607A" stroke-width="11" stroke-linecap="round"/>
+            <path d="M104 159 L104 185 M104 175 L116 175 M118 175 C127 169 136 160 143 150" fill="none" stroke="#4A607A" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="100" cy="98" r="8.5" fill="#E87A5D"/>
+            <path d="M95.5 103 L92.5 121 C92.2 122.8 93.6 124.5 95.5 124.5 L104.5 124.5 C106.4 124.5 107.8 122.8 107.5 121 L104.5 103 Z" fill="#E87A5D"/>
+          </svg>
+          <div>
+            <b class="wordmark">LIFE LOCK IN</b>
+            <small>The Adaptive Path · Chief of Staff &amp; Life OS</small>
+          </div>
         </div>
         ${formHtml}
       </div>
@@ -222,7 +251,7 @@ function renderAuthScreen(){
     const fresh=freshUserDefaults(em,newUser.name);
     localStorage.setItem('steady.user.'+em,JSON.stringify(fresh));
     loginUser(newUser,true);
-    toast('Account created! Complete the 6 modules to personalize your Steady OS.');
+    toast('Account created! Complete the 6 modules to personalize your Life Lock In OS.');
   };
 
   const resetReqForm=$('#resetReqForm');
@@ -274,7 +303,7 @@ function viewToday(){
     <div class="card" style="margin-bottom:18px;border-color:var(--accent)">
       <div class="hd">
         <div>
-          <p class="eyebrow">App Guidance · Getting Started with Steady</p>
+          <p class="eyebrow">App Guidance · Getting Started with Life Lock In</p>
           <h2>Welcome to your personal Chief of Staff${prof.name?', '+esc(prof.name):''}</h2>
         </div>
         <div class="row">
@@ -301,7 +330,7 @@ function viewToday(){
       </div>
     </div>`:'';
 
-  const curAgName=(AG[cur.agent]&&AG[cur.agent].name)||'Steady';
+  const curAgName=(AG[cur.agent]&&AG[cur.agent].name)||'Life Lock In';
   const nowCard=`
     <section class="card accent">
       <div class="hd">
@@ -409,7 +438,7 @@ function viewToday(){
       <ol class="tl">
         ${dayList.map(s=>{
           const isCur=(selectedDayIdx===todayDayIdx)&&!n.before&&s.id===cur.id;
-          const agName=(AG[s.agent]&&AG[s.agent].name)||'Steady';
+          const agName=(AG[s.agent]&&AG[s.agent].name)||'Life Lock In';
           const freqStr=fmtFreq(s.days,s.specificDate);
           const rowCls=[ck[s.id]?'done':'',isCur?'cur':'',s.isObligation?'ob':'',s.isAutoFill?'autofill':''].filter(Boolean).join(' ');
           return `<li class="${rowCls}">
@@ -454,8 +483,8 @@ function viewToday(){
   return `
     <header class="page-head">
       <div>
-        <p class="eyebrow">${esc(ds)}${prof.city?' · '+esc(prof.city):''} · ${esc(prof.programPack||'Steady OS')}</p>
-        <h1>${esc(prof.name?prof.name+'’s ':'')}Steady Command Center</h1>
+        <p class="eyebrow">${esc(ds)}${prof.city?' · '+esc(prof.city):''} · ${esc(prof.programPack||'Life Lock In OS')}</p>
+        <h1>${esc(prof.name?prof.name+'’s ':'')}Life Lock In Command Center</h1>
       </div>
       <div class="row">
         <button class="btn sun" data-act="open-morning">Morning Ignition</button>
@@ -488,7 +517,7 @@ function viewChief(){
     </header>
     <div class="chips">${chips}</div>
     <div class="thread" id="thread">
-      ${!msgs.length?`<div class="msg bot"><p class="meta">Chief · Ready</p><p class="body">Hello ${esc(prof.name||'friend')}. I am your Chief of Staff (${esc(prof.programPack||'Steady OS')}). I coordinate your 8 specialist agents:\n• Anchor (Structure & Shield) · Spark (Morning Mindset) · Body (Workouts & ${prof.proteinTarget||180}g Protein Meals)\n• Ticker (Morning Stock Trades) · Scout (Deals & Reseller Flips) · Wrench (Home & Auto DIY)\n• Launch (Ventures & Outreach) · Circle (Family & ${(prof.favoriteSports||[]).slice(0,3).join(', ')||'Sports'})\n\nTap a command chip above or tell me what’s on your mind.</p></div>`:''}
+      ${!msgs.length?`<div class="msg bot"><p class="meta">Chief · Ready</p><p class="body">Hello ${esc(prof.name||'friend')}. I am your Chief of Staff (${esc(prof.programPack||'Life Lock In OS')}). I coordinate your 8 specialist agents:\n• Anchor (Structure & Shield) · Spark (Morning Mindset) · Body (Workouts & ${prof.proteinTarget||180}g Protein Meals)\n• Ticker (Morning Stock Trades) · Scout (Deals & Reseller Flips) · Wrench (Home & Auto DIY)\n• Launch (Ventures & Outreach) · Circle (Family & ${(prof.favoriteSports||[]).slice(0,3).join(', ')||'Sports'})\n\nTap a command chip above or tell me what’s on your mind.</p></div>`:''}
       ${msgs.map(m=>{
         const you=m.from==='you',who=you?'You':'Chief of Staff';
         return `<div class="msg ${you?'you':'bot'}"><p class="meta">${esc(who)} · ${esc(clockOf(m.ts))}</p><div class="body">${esc(m.t)}</div>${m.tasks&&m.tasks.length?`<div class="issued"><b>Tasks Issued:</b> ${m.tasks.map(t=>`<span class="tag">${esc(AG[t.agent].name)}</span> ${esc(t.title)}`).join(' · ')}</div>`:''}</div>`;
@@ -1189,9 +1218,19 @@ function viewTeam(){
     <div class="grid-2">
       <div class="stack">
         <section class="card">
+          <h3>Brand Identity · LIFE LOCK IN — The Adaptive Path</h3>
+          <p class="hint"><b>The Adaptive Path</b> intertwines a protective outer shield with a fluid, continuous padlock shackle and central keyhole—balancing emotional warmth and personal agency in a safe, grounded space where users unlock stability and take control of their daily lives.</p>
+          <div class="grid-2 equal" style="gap:8px;margin-top:4px">
+            <div class="card soft" style="padding:10px;border-left:4px solid #E87A5D"><b>Warm Coral</b><span class="mono small">#E87A5D · Primary Accent</span></div>
+            <div class="card soft" style="padding:10px;border-left:4px solid #4A607A"><b>Calming Slate Blue</b><span class="mono small">#4A607A · Secondary Accent</span></div>
+            <div class="card soft" style="padding:10px;border-left:4px solid #EDF2EB"><b>Soft Off-White</b><span class="mono small">#EDF2EB · Wordmark &amp; Ink</span></div>
+            <div class="card soft" style="padding:10px;border-left:4px solid #2B2B2B"><b>Deep Charcoal</b><span class="mono small">#2B2B2B · Canvas Backdrop</span></div>
+          </div>
+        </section>
+        <section class="card">
           <h3>Live Agent Topology</h3>
           <div class="hub">${hubSvg()}</div>
-          <p class="hint small">iOS &amp; Desktop Install Tip: On iPhone Safari, tap <b>Share → Add to Home Screen</b> to run Steady full-screen like a native iOS app.</p>
+          <p class="hint small">iOS &amp; Desktop Install Tip: On iPhone Safari, tap <b>Share → Add to Home Screen</b> to run Life Lock In full-screen like a native iOS app.</p>
         </section>
         <section class="card">
           <h3>Multi-User Privacy &amp; Program Packs</h3>
@@ -1220,8 +1259,8 @@ function viewTeam(){
 function foot(){
   const prof=state.profile||{};
   return `<footer class="foot">
-    <span><b>Steady OS</b> · Private Account: ${esc(currentUser?currentUser.email:'Guest')}${prof.city?' · '+esc(prof.city):''} · Coaching &amp; productivity architecture (not medical or financial advice; in a US crisis call/text 988).</span>
-    <span>iOS &amp; Desktop Ready</span>
+    <span><b>LIFE LOCK IN — The Adaptive Path</b> · Private Account: ${esc(currentUser?currentUser.email:'Guest')}${prof.city?' · '+esc(prof.city):''} · Coaching &amp; productivity architecture (not medical or financial advice; in a US crisis call/text 988).</span>
+    <span>lifelockin.com · iOS &amp; Desktop Ready</span>
   </footer>`;
 }
 
@@ -1368,7 +1407,7 @@ function act(a,el){
     }
     case 'export-json':{
       const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='steady-'+(currentUser?currentUser.email.split('@')[0]:'backup')+'-'+dkey()+'.json';a.click();
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifelockin-'+(currentUser?currentUser.email.split('@')[0]:'backup')+'-'+dkey()+'.json';a.click();
       toast('Private account backup downloaded.');
       break;
     }
