@@ -1,6 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
-  <rect width="180" height="180" rx="40" fill="#0E2227"/>
-  <circle cx="90" cy="76" r="38" fill="#E9A21B"/>
-  <rect x="28" y="116" width="124" height="16" rx="8" fill="#0B8C86"/>
-  <rect x="52" y="140" width="76" height="12" rx="6" fill="#38C6BC" opacity=".65"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="coralToSlate" x1="20%" y1="10%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#F08B6D"/>
+      <stop offset="55%" stop-color="#E87A5D"/>
+      <stop offset="100%" stop-color="#5B677A"/>
+    </linearGradient>
+    <linearGradient id="warmCoral" x1="15%" y1="0%" x2="80%" y2="95%">
+      <stop offset="0%" stop-color="#F28E71"/>
+      <stop offset="65%" stop-color="#E87A5D"/>
+      <stop offset="100%" stop-color="#B56A63"/>
+    </linearGradient>
+    <linearGradient id="slateBlue" x1="25%" y1="15%" x2="85%" y2="95%">
+      <stop offset="0%" stop-color="#8C6D68"/>
+      <stop offset="45%" stop-color="#58677B"/>
+      <stop offset="100%" stop-color="#4A607A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep Charcoal Backdrop -->
+  <rect width="200" height="200" rx="42" fill="#2B2B2B"/>
+
+  <!-- Upper-Right Shield Shoulder -->
+  <path d="M126 39 C139 43 151 48 161 53 C162 72 160 91 154 108"
+        fill="none" stroke="url(#slateBlue)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Left Shield Wall & Continuous Lower-Left Loop -->
+  <path d="M62 46 C53 49 45 51 39 54 C38 86 45 117 65 137 C83 153 113 149 126 128 C135 114 132 94 118 83"
+        fill="none" stroke="url(#coralToSlate)" stroke-width="11.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Padlock Shackle Arch & Inner Left Swirl -->
+  <path d="M124 72 C124 47 121 25 100 25 C79 25 75 48 75 72 C75 96 61 112 76 129"
+        fill="none" stroke="url(#warmCoral)" stroke-width="11.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Inner Circle Over-Arch & Right Shield Sweep (Adaptive Path Interlock) -->
+  <path d="M68 96 C73 74 97 64 119 72 C141 80 151 106 141 131 C134 147 121 159 106 167"
+        fill="none" stroke="url(#slateBlue)" stroke-width="11.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Bottom-Left Shield Point -->
+  <path d="M63 151 C72 162 82 171 93 178"
+        fill="none" stroke="#4A607A" stroke-width="10.5" stroke-linecap="round"/>
+
+  <!-- Bottom-Right Key Stem, Key Bit & Lower Shield Tip -->
+  <path d="M104 159 L104 185 M104 175 L116 175 M118 175 C127 169 136 160 143 150"
+        fill="none" stroke="#4A607A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Central Warm Coral Keyhole -->
+  <circle cx="100" cy="98" r="8.5" fill="#E87A5D"/>
+  <path d="M95.5 103 L92.5 121 C92.2 122.8 93.6 124.5 95.5 124.5 L104.5 124.5 C106.4 124.5 107.8 122.8 107.5 121 L104.5 103 Z" fill="#E87A5D"/>
 </svg>

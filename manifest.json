@@ -1,12 +1,12 @@
 {
-  "name": "Steady — Chief of Staff OS",
-  "short_name": "Steady",
-  "description": "Personal AI Chief of Staff & 8-Agent Life OS for Palm Springs",
+  "name": "LIFE LOCK IN — The Adaptive Path",
+  "short_name": "Life Lock In",
+  "description": "Personal AI Chief of Staff & 8-Agent Life OS — The Adaptive Path",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0A161A",
-  "theme_color": "#0B8C86",
+  "background_color": "#2B2B2B",
+  "theme_color": "#2B2B2B",
   "icons": [
     {
       "src": "./icon.svg",
