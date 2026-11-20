@@ -56,6 +56,14 @@
         <div><b id="userNameDisp">User</b><span class="hint small mono" id="userEmailDisp"></span></div>
         <button class="btn sm link" id="logoutBtn" type="button" title="Log Out / Switch User">Log Out</button>
       </div>
+      <a class="btn sm" href="/jobs" style="display:flex;align-items:center;justify-content:center;gap:7px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-weight:600;padding:8px 12px;border-radius:8px;text-decoration:none;font-size:12px;">
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" aria-hidden="true">
+          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+        </svg>
+        <span>Jobs App</span>
+        <span style="font-family:var(--font-mono, monospace);font-size:9.5px;background:#38bdf8;color:#0f172a;font-weight:700;padding:1px 6px;border-radius:99px;margin-left:auto;">15</span>
+      </a>
       <button class="btn sun sm" id="wakeBtn" type="button">Morning Ignition</button>
       <a id="fpill" href="#today"></a>
       <div class="railmeta" id="sync">Saved on device</div>
@@ -70,5 +78,30 @@
 <script src="./steady-data.js"></script>
 <script src="./steady-engine.js"></script>
 <script src="./steady-views.js"></script>
+<script>
+// Seamlessly inject Jobs App navigation link into Primary Navigation rail
+(function() {
+  function injectJobsNav() {
+    const nav = document.getElementById("nav");
+    if (nav && !nav.querySelector('a[href="/jobs"]')) {
+      const a = document.createElement("a");
+      a.href = "/jobs";
+      a.setAttribute("data-app", "jobs");
+      a.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg><span>Jobs App</span><span class="badge" style="background:#38bdf8;color:#0f172a;font-weight:700;">15</span>';
+      if (nav.children.length >= 2) {
+        nav.insertBefore(a, nav.children[2]);
+      } else {
+        nav.appendChild(a);
+      }
+    }
+  }
+  const obs = new MutationObserver(injectJobsNav);
+  const nav = document.getElementById("nav");
+  if (nav) obs.observe(nav, { childList: true });
+  window.addEventListener("DOMContentLoaded", injectJobsNav);
+  window.addEventListener("load", injectJobsNav);
+  injectJobsNav();
+})();
+</script>
 </body>
 </html>
