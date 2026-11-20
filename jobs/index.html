@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matthew Bennett — Job Applications | Life Lock In</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./jobs.css">
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <a class="home-link" href="/" title="Return to Chief of Staff OS">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        lifelockin.com
+      </a>
+      <div>
+        <h1>🚀 Autonomous Job Application Agent <span style="font-size:11px; font-weight:normal; background:#0284c7; color:#fff; padding:2px 8px; border-radius:12px; margin-left:6px; font-family:'IBM Plex Mono',monospace;">lifelockin.com/jobs</span></h1>
+        <p><strong>Candidate:</strong> Matthew Bennett &nbsp;|&nbsp; <strong>Target Roles:</strong> Cloud Marketplace, Enterprise Sales, Strategic Alliances & Partnerships</p>
+      </div>
+    </div>
+    <div class="header-links">
+      <a id="companySheetLink" href="#" target="_blank" rel="noopener">🏢 Target Companies Sheet ↗</a>
+      <a id="filterSheetLink" href="#" target="_blank" rel="noopener">📊 Q&A + Filters Sheet ↗</a>
+      <button onclick="toggleConfigDrawer()" id="updateSourceBtn">⚙️ Update Source ▾</button>
+    </div>
+  </header>
+
+  <div class="metrics" id="metrics"></div>
+
+  <div class="config-drawer" id="configDrawer">
+    <div class="config-card">
+      <h3>
+        <span>🔧 Agent Filter Parameters</span>
+        <a id="editParamsSheetLink" href="#" target="_blank" style="font-size:12px; color:#38bdf8; text-decoration:none;">Open Sheet ↗</a>
+      </h3>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Select a parameter key to view its active values:</div>
+      <select id="paramKeySelect" style="width:100%;" onchange="onParamSelected()"></select>
+      <div style="margin-top:8px;">
+        <input type="text" id="paramValueInput" style="width:100%;" readonly />
+      </div>
+      <div style="margin-top:6px; font-size:11.5px; color:var(--muted);">
+        <strong id="paramCategory"></strong>: <span id="paramDesc"></span>
+      </div>
+    </div>
+
+    <div class="config-card">
+      <h3>
+        <span>🏢 Company Career Sources</span>
+        <span id="companyCountBadge" style="font-size:11.5px; color:#94a3b8; font-weight:normal;">117 companies tracked</span>
+      </h3>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Direct career sites are pulled directly from your Google Sheet.</div>
+      <div style="margin-top:12px; padding:10px; background:#0f172a; border-radius:6px; font-size:12px; line-height:1.5;">
+        <span>To add a new target tech company or update company career URLs:</span><br/>
+        <a id="addCompanySheetLink" href="#" target="_blank" style="color:#38bdf8; font-weight:600; display:inline-block; margin-top:6px;">Open top_us_tech_careers Tab in Google Sheets ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar-list">
+      <div style="margin-bottom:12px;">
+        <input type="text" id="searchInput" placeholder="Search Company or Role Title..." style="width:100%; margin-bottom:8px;" oninput="onSearchChange()" />
+        <select id="statusFilter" style="width:100%;" onchange="onStatusFilterChange()">
+          <option value="All">Filter: All Statuses</option>
+          <option value="Discovered">Discovered</option>
+          <option value="Pending Approval">Pending Approval</option>
+          <option value="Approved">Approved</option>
+          <option value="Submitted">Submitted</option>
+          <option value="Interviewing">Interviewing</option>
+          <option value="Offer">Offer</option>
+        </select>
+      </div>
+      <div id="jobList"></div>
+    </div>
+
+    <div class="detail-pane" id="detailPane">
+      <div style="text-align:center; padding:100px 20px; color:var(--muted);">
+        Select an active role from the sidebar to inspect details and review the tailored resume.
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Synchronous Data Bundles -->
+  <script src="./jobs-data.js"></script>
+  <script src="./details-1.js"></script>
+  <script src="./details-2.js"></script>
+  <script src="./details-3.js"></script>
+  <script src="./details-4.js"></script>
+  <script src="./details-5.js"></script>
+
+  <script>
+    const FALLBACK_BASE_RESUME = `# Matthew Bennett
+Los Angeles, CA | (425) 829-5884 | mrmattbennett@gmail.com | https://www.linkedin.com/in/mrmattbennett
+
+## Executive Summary
+Marketplace Business Development and Enterprise Sales Leader with over a decade of experience selling enterprise software and scaling cloud ecosystems from inception to $1B+ ARR. A proven builder and top producer who navigates ambiguity to solve complex problems and architect custom commercial models for Fortune 500s and Tier-1 ISVs. Highly effective cross-functional operator skilled in managing multi-faceted relationships with hyperscalers and their channel partners. Excel at resolving deal escalations and aligning enterprise cloud commitments with high-velocity GTM motions to drive continuous revenue growth.
+
+## Core Competencies
+- 0-1 Ecosystem Building & Strategic Partnerships
+- Multi-Party Co-selling & Marketplace Operations
+- Custom Commercial Architecture & Contract Negotiation
+- GTM Strategy & Cross-Functional Leadership
+- Executive Advisory & Pilot Program Ownership
+
+## Work Experience
+
+### Independent Entrepreneur, Consultant & Technical Builder (May 2025 – Present)
+- **Product Development:** Architected and developed a full-stack, AI-driven customer acquisition platform from the ground up, utilizing agentic workflow automations and complex payment integrations to solve localized market inefficiencies for local business owners.
+- **Market Readiness:** Maintained deep fluency in evolving multi-cloud commercial models, specifically tracking the expansion of Marketplace buying centers from IT infrastructure to line of business applications.
+
+### Google Inc. — Global Strategic Channel Manager, Google Cloud Marketplace (May 2024 – May 2025 | Los Angeles, CA)
+- **Revenue Leadership:** Orchestrated multi-party Channel Partner Private Offers across 35 strategic partners, including Informatica. Designed channel economics into enterprise deals, enabling customers to draw down committed cloud spend via partner channels and generating $1B+ in incremental ecosystem revenue.
+- **Operational Scalability:** Designed transaction frameworks and resolved complex governance bottlenecks across sales, legal, and operational disciplines, reducing channel procurement execution cycles from 6 months to 2 weeks.
+
+### Google Inc. — Lead, Data & GenAI Global Strategic ISV Partnerships, Google Cloud Marketplace (May 2021 – May 2024 | Los Angeles, CA)
+- **Category Leadership:** Owned GTM strategy and scaled the Data & GenAI Marketplace category to $500M+ in new revenue. Successfully achieved >100% of target quotas year-over-year.
+- **Strategic Pipeline Acceleration:** Co-authored and executed joint GTM motions across 25+ Tier-1 ISVs (e.g., Fivetran, dbt Labs). Advised executive leadership on marketplace transaction structures, successfully converting high-friction enterprise procurement cycles into accelerated cloud drawdowns.
+- **Pilot Program Ownership:** Selected by leadership to pilot the Marketplace Sales Lead Program, establishing foundational operating mechanisms, joint pipeline reviews, and compensation structures later adopted globally.
+
+### Google Inc. — Founding Team Member & Enterprise Account Executive, Google Cloud Marketplace (Aug 2016 – May 2021 | Los Angeles, CA)
+- **0-1 Foundation:** Key contributor in launching and scaling Google Cloud Marketplace from its inception, expanding the ecosystem 10x to $250M+ in annual transaction volume.
+- **Contract Architecture:** Crafted bespoke legal, financial, and operational frameworks for Fortune 500 customers, paving the way for multi-million dollar third-party software transactions on GCP.
+
+### Orbitera, Inc. — Head of Sales & Business Development (Oct 2014 – Aug 2016 | Seattle, WA)
+- **Startup Growth & Acquisition:** Directed GTM strategy for a pioneering multi-cloud marketplace platform, driving $5M+ in new enterprise revenue and managed AWS Marketplace listings as Seller of Record for Adobe, Oracle, and Suse, providing a foundational understanding of the underlying hyperscaler consumption models driving modern software monetization.
+- **Solution Architecture:** Designed multi-cloud billing and metering architectures, enabling complex ISVs to efficiently package and price solutions across disparate cloud environments.
+
+## Education
+**University of Washington** (Seattle, WA | June 2008)
+- B.A. Economics
+- Sales & Marketing Program Certificate – Michael G. Foster School of Business`;
+
+    let allJobs = (window.INITIAL_JOBS || []);
+    let filteredJobs = [...allJobs];
+    let selectedId = null;
+    let resumeViewMode = 'track';
+    let currentFilter = 'All';
+    let searchQuery = '';
+    let trackedBlocksByJob = {};
+
+    const details = window.JOB_DETAILS || {};
+    allJobs.forEach(j => {
+      if (details[j.id]) {
+        Object.assign(j, details[j.id]);
+      }
+    });
+
+    const LOCAL_STATUS_KEY = 'matthew_job_status_overrides';
+    function getStatusOverrides() {
+      try { return JSON.parse(localStorage.getItem(LOCAL_STATUS_KEY) || '{}'); }
+      catch(e) { return {}; }
+    }
+    function setStatusOverride(jobId, newStatus) {
+      const overrides = getStatusOverrides();
+      overrides[jobId] = newStatus;
+      localStorage.setItem(LOCAL_STATUS_KEY, JSON.stringify(overrides));
+      const job = allJobs.find(j => j.id === jobId);
+      if (job) job.status = newStatus;
+    }
+
+    const overrides = getStatusOverrides();
+    allJobs.forEach(j => {
+      if (overrides[j.id]) j.status = overrides[j.id];
+    });
+
+    function computeTrackedBlocks(baseText, tailoredText) {
+      function cleanLines(txt) {
+        return (txt || '').replace(/^### Tailoring & Match Highlights[\s\S]*$/m, '')
+          .replace(/^## Review & Approve:[\s\S]*$/m, '')
+          .trim().split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('**Target Role') && !l.startsWith('**Core Focus'));
+      }
+      const a = cleanLines(baseText);
+      const b = cleanLines(tailoredText);
+      const m = a.length, n = b.length;
+      const dp = Array.from({length: m + 1}, () => new Uint16Array(n + 1));
+      for (let i = 0; i < m; i++) {
+        for (let j = 0; j < n; j++) {
+          if (a[i] === b[j]) dp[i+1][j+1] = dp[i][j] + 1;
+          else dp[i+1][j+1] = Math.max(dp[i+1][j], dp[i][j+1]);
+        }
+      }
+      let i = m, j = n;
+      const rawDiffs = [];
+      while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+          rawDiffs.push({type: 'equal', base: a[i-1], tail: b[j-1]});
+          i--; j--;
+        } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+          rawDiffs.push({type: 'insert', base: '', tail: b[j-1]});
+          j--;
+        } else {
+          rawDiffs.push({type: 'delete', base: a[i-1], tail: ''});
+          i--;
+        }
+      }
+      rawDiffs.reverse();
+
+      const blocks = [];
+      let changeIdx = 1;
+      let k = 0;
+      while (k < rawDiffs.length) {
+        const cur = rawDiffs[k];
+        if (cur.type === 'equal') {
+          blocks.push({
+            id: 'eq_' + k,
+            type: 'equal',
+            base_text: cur.base,
+            tailored_text: cur.tail,
+            status: 'equal'
+          });
+          k++;
+        } else {
+          const baseParts = [];
+          const tailParts = [];
+          while (k < rawDiffs.length && rawDiffs[k].type !== 'equal') {
+            if (rawDiffs[k].base) baseParts.push(rawDiffs[k].base);
+            if (rawDiffs[k].tail) tailParts.push(rawDiffs[k].tail);
+            k++;
+          }
+          const baseText = baseParts.join('\n');
+          const tailText = tailParts.join('\n');
+          let label = 'Modified from Base Resume';
+          let type = 'replace';
+          if (!baseText) { type = 'insert'; label = 'New Tailored Addition'; }
+          else if (!tailText) { type = 'delete'; label = 'Removed from Base Resume'; }
+
+          blocks.push({
+            id: 'chg_' + changeIdx,
+            change_num: changeIdx,
+            type: type,
+            label: label,
+            base_text: baseText,
+            tailored_text: tailText,
+            status: 'pending'
+          });
+          changeIdx++;
+        }
+      }
+      return blocks;
+    }
+
+    function init() {
+      const cfg = window.INITIAL_CONFIG || {};
+      const companyUrl = cfg.career_sources_url || "https://docs.google.com/spreadsheets/d/114AoWET16MNHi5zJTwM71kMkh4qBNcnsbhUi_ZzXZ6Y/edit?gid=2091292570#gid=2091292570";
+      const filterUrl = cfg.spreadsheet_url || "https://docs.google.com/spreadsheets/d/1IRIumpzqp-xp_iKkfKp7P3NCd9X6vmOjbTSAWedp-Cg/edit";
+
+      document.getElementById('companySheetLink').href = companyUrl;
+      document.getElementById('addCompanySheetLink').href = companyUrl;
+      document.getElementById('filterSheetLink').href = filterUrl;
+      document.getElementById('editParamsSheetLink').href = filterUrl;
+
+      const params = cfg.parameters || [];
+      const sel = document.getElementById('paramKeySelect');
+      sel.innerHTML = params.map(p => `<option value="${p.key}">${p.key} (${p.category})</option>`).join('');
+      onParamSelected();
+
+      applyFilters();
+      if (filteredJobs.length > 0) {
+        selectJob(filteredJobs[0].id);
+      }
+    }
+
+    function toggleConfigDrawer() {
+      const drawer = document.getElementById('configDrawer');
+      const btn = document.getElementById('updateSourceBtn');
+      drawer.classList.toggle('open');
+      btn.textContent = drawer.classList.contains('open') ? '⚙️ Update Source ▴' : '⚙️ Update Source ▾';
+    }
+
+    function onParamSelected() {
+      const cfg = window.INITIAL_CONFIG || {};
+      const params = cfg.parameters || [];
+      const key = document.getElementById('paramKeySelect').value;
+      const item = params.find(p => p.key === key);
+      if (!item) return;
+      document.getElementById('paramValueInput').value = item.value || '';
+      document.getElementById('paramDesc').textContent = item.description || '';
+      document.getElementById('paramCategory').textContent = item.category || '';
+    }
+
+    function onSearchChange() {
+      searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+      applyFilters();
+    }
+
+    function onStatusFilterChange() {
+      currentFilter = document.getElementById('statusFilter').value;
+      applyFilters();
+    }
+
+    function applyFilters() {
+      filteredJobs = allJobs.filter(j => {
+        if (currentFilter !== 'All' && j.status !== currentFilter) {
+          if (currentFilter === 'Approved' && !j.status.startsWith('Approved')) return false;
+          if (currentFilter !== 'Approved') return false;
+        }
+        if (searchQuery) {
+          const matchCompany = (j.company || '').toLowerCase().includes(searchQuery);
+          const matchTitle = (j.title || '').toLowerCase().includes(searchQuery);
+          if (!matchCompany && !matchTitle) return false;
+        }
+        return true;
+      });
+
+      renderMetrics();
+      renderJobList();
+      if (!filteredJobs.some(j => j.id === selectedId) && filteredJobs.length > 0) {
+        selectJob(filteredJobs[0].id);
+      }
+    }
+
+    function renderMetrics() {
+      const total = allJobs.length;
+      const pending = allJobs.filter(j => j.status === 'Pending Approval').length;
+      const approved = allJobs.filter(j => j.status.startsWith('Approved')).length;
+      const submitted = allJobs.filter(j => j.status === 'Submitted').length;
+      const interviewing = allJobs.filter(j => j.status === 'Interviewing' || j.status === 'Offer').length;
+
+      document.getElementById('metrics').innerHTML = `
+        <div class="metric-card"><div class="label">Total Active Roles</div><div class="val">${total}</div></div>
+        <div class="metric-card"><div class="label">Pending Approval</div><div class="val" style="color:#fde047">${pending}</div></div>
+        <div class="metric-card"><div class="label">Approved</div><div class="val" style="color:#38bdf8">${approved}</div></div>
+        <div class="metric-card"><div class="label">Submitted</div><div class="val" style="color:#4ade80">${submitted}</div></div>
+        <div class="metric-card"><div class="label">Interviewing / Offer</div><div class="val" style="color:#c084fc">${interviewing}</div></div>
+      `;
+    }
+
+    function renderJobList() {
+      const listEl = document.getElementById('jobList');
+      if (filteredJobs.length === 0) {
+        listEl.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">No matching roles found.</div>`;
+        return;
+      }
+      listEl.innerHTML = filteredJobs.map(j => {
+        const cls = j.status.split(' ')[0];
+        const active = j.id === selectedId ? 'active' : '';
+        return `
+          <div class="job-item ${active}" onclick="selectJob(${j.id})">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong style="color:#f8fafc;">${escapeHtml(j.company)}</strong>
+              <span class="badge ${cls}">${j.status}</span>
+            </div>
+            <div style="margin-top:5px; font-size:13.5px; font-weight:500;">${escapeHtml(j.title)}</div>
+            <div style="margin-top:4px; font-size:11.5px; color:var(--muted);">${escapeHtml(j.location || 'Remote')} • ${escapeHtml(j.source_board || '')}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectJob(id) {
+      selectedId = id;
+      renderJobList();
+      const job = allJobs.find(j => j.id === id);
+      if (!job) return;
+
+      if (!trackedBlocksByJob[job.id]) {
+        trackedBlocksByJob[job.id] = computeTrackedBlocks(FALLBACK_BASE_RESUME, job.tailored_resume_md || '');
+      }
+
+      const gdocUrl = job.gdoc_url || '';
+      const pdfExportUrl = job.pdf_export_url || (gdocUrl ? getPdfExportUrl(gdocUrl) : '');
+      const fitSummaryHtml = (job.match_summary || '').replace('### Tailoring & Match Highlights', '').trim();
+
+      const detailEl = document.getElementById('detailPane');
+      detailEl.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:16px;">
+          <div>
+            <h2 style="margin:0 0 4px 0; font-size:22px; font-family:'Bricolage Grotesque', sans-serif;">
+              ${escapeHtml(job.company)} — ${escapeHtml(job.title)}
+            </h2>
+            <div style="color:var(--muted); font-size:12.5px;">
+              📍 ${escapeHtml(job.location || 'Remote')} &nbsp;|&nbsp;
+              🏷️ ${escapeHtml(job.source_board || 'Direct Career Site')} &nbsp;|&nbsp;
+              🔗 <a href="${job.job_url}" target="_blank" rel="noopener" style="color:#38bdf8; text-decoration:none;">View Job Listing ↗</a>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <select onchange="onJobStatusChange(${job.id}, this.value)">
+              <option value="Pending Approval" ${job.status === 'Pending Approval' ? 'selected' : ''}>Pending Approval</option>
+              <option value="Approved" ${job.status.startsWith('Approved') ? 'selected' : ''}>Approved</option>
+              <option value="Submitted" ${job.status === 'Submitted' ? 'selected' : ''}>Submitted</option>
+              <option value="Interviewing" ${job.status === 'Interviewing' ? 'selected' : ''}>Interviewing</option>
+              <option value="Offer" ${job.status === 'Offer' ? 'selected' : ''}>Offer</option>
+            </select>
+            ${gdocUrl ? `<a href="${gdocUrl}" target="_blank" class="approve-btn" style="text-decoration:none; padding:7px 12px; border-radius:6px; font-size:12.5px; display:inline-flex; align-items:center; gap:5px;">🔗 Open Google Doc ↗</a>` : ''}
+            ${pdfExportUrl ? `<a href="${pdfExportUrl}" target="_blank" class="primary" style="text-decoration:none; padding:7px 12px; border-radius:6px; font-size:12.5px; display:inline-flex; align-items:center; gap:5px;">📥 Download PDF ↗</a>` : ''}
+          </div>
+        </div>
+
+        <div class="fit-summary-section">
+          <h3>🎯 Why You Are a Good Fit for ${escapeHtml(job.company)} — ${escapeHtml(job.title)}</h3>
+          <div class="fit-summary-body">${formatRichText(fitSummaryHtml)}</div>
+        </div>
+
+        <div class="job-desc-compact">
+          <details open>
+            <summary>📄 Full Job Description (Click to collapse/expand)</summary>
+            <div class="job-desc-scroll">${escapeHtml(job.job_description || 'No description available.')}</div>
+          </details>
+        </div>
+
+        <div class="resume-fullwidth-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-weight:700; font-size:14px; color:#38bdf8;">✨ Tailored Resume</span>
+              <button onclick="setResumeViewMode('track')" class="${resumeViewMode === 'track' ? 'primary' : ''}" style="padding:4px 10px; font-size:11.5px;">📝 Track Changes (Suggesting)</button>
+              <button onclick="setResumeViewMode('gdoc')" class="${resumeViewMode === 'gdoc' ? 'primary' : ''}" style="padding:4px 10px; font-size:11.5px;">📄 Embedded Live Google Doc</button>
+            </div>
+            ${resumeViewMode === 'track' ? `
+              <div style="display:flex; gap:6px;">
+                <button onclick="handleAllSuggestions(${job.id}, 'accepted')" style="padding:4px 8px; font-size:11px; background:#15803d; color:#fff; border:none; border-radius:4px; cursor:pointer;">✓ Accept All</button>
+                <button onclick="handleAllSuggestions(${job.id}, 'rejected')" style="padding:4px 8px; font-size:11px; background:#334155; color:#fff; border:none; border-radius:4px; cursor:pointer;">✕ Reject All</button>
+              </div>
+            ` : ''}
+          </div>
+
+          ${resumeViewMode === 'track' ? renderTrackChangesView(job) : renderGoogleDocIframe(job)}
+        </div>
+      `;
+    }
+
+    function renderGoogleDocIframe(job) {
+      if (!job.gdoc_url) {
+        return `
+          <div style="text-align:center; padding:60px 20px; color:var(--muted);">
+            No Google Doc link available for this role yet.<br/>
+            You can review the tailored content directly in Track Changes view.
+          </div>
+        `;
+      }
+      return `<iframe src="${job.gdoc_url}?rm=minimal" style="width:100%; height:750px; border:none; border-radius:6px; margin-top:10px; background:#fff;"></iframe>`;
+    }
+
+    function renderTrackChangesView(job) {
+      const blocks = trackedBlocksByJob[job.id] || [];
+      let paperHtml = '';
+      let cardsHtml = '';
+
+      for (const blk of blocks) {
+        if (blk.type === 'equal') {
+          paperHtml += `<div>${formatRichText(blk.tailored_text)}</div>\n`;
+          continue;
+        }
+
+        if (blk.status === 'accepted') {
+          if (blk.tailored_text) {
+            paperHtml += `<div style="border-left:3px solid #16a34a; padding-left:8px; background:#f0fdf4; margin:4px 0;">${formatRichText(blk.tailored_text)}</div>\n`;
+          }
+        } else if (blk.status === 'rejected') {
+          if (blk.base_text) {
+            paperHtml += `<div style="border-left:3px solid #64748b; padding-left:8px; background:#f8fafc; margin:4px 0;">${formatRichText(blk.base_text)}</div>\n`;
+          }
+        } else {
+          paperHtml += `<div class="track-block-pending" id="doc_blk_${blk.id}" style="margin:6px 0; padding:4px; border:1px dashed #38bdf8; border-radius:4px; background:#f0f9ff;">`;
+          paperHtml += `<div style="font-size:10px; color:#0284c7; font-weight:700; margin-bottom:2px;">[Change #${blk.change_num} — Pending Review]</div>`;
+          if (blk.base_text) paperHtml += `<div><del class="track-del">${escapeHtml(blk.base_text)}</del></div>`;
+          if (blk.tailored_text) paperHtml += `<div><ins class="track-ins">${formatRichText(blk.tailored_text)}</ins></div>`;
+          paperHtml += `</div>\n`;
+        }
+
+        const isAccepted = blk.status === 'accepted';
+        const isRejected = blk.status === 'rejected';
+        const cardClass = isAccepted ? 'accepted' : (isRejected ? 'rejected' : '');
+
+        cardsHtml += `
+          <div class="suggestion-card ${cardClass}" id="card_${blk.id}">
+            <div class="header">
+              <span>Change #${blk.change_num}</span>
+              <span>${isAccepted ? '✓ Accepted' : (isRejected ? '✕ Rejected' : '● Pending')}</span>
+            </div>
+            <div style="font-size:11px; color:var(--muted);">${escapeHtml(blk.label)}</div>
+            ${blk.base_text ? `<div style="margin-top:4px; font-size:11px; color:#f87171; background:rgba(239,68,68,0.1); padding:4px; border-radius:3px;"><strong>Base:</strong> ${escapeHtml(blk.base_text.slice(0, 100))}${blk.base_text.length > 100 ? '...' : ''}</div>` : ''}
+            ${blk.tailored_text ? `<div style="margin-top:4px; font-size:11px; color:#4ade80; background:rgba(34,197,94,0.1); padding:4px; border-radius:3px;"><strong>Tailored:</strong> ${escapeHtml(blk.tailored_text.slice(0, 100))}${blk.tailored_text.length > 100 ? '...' : ''}</div>` : ''}
+            <div style="display:flex; gap:6px; margin-top:8px;">
+              <button class="btn-approve" onclick="handleSuggestionDecision(${job.id}, '${blk.id}', 'accepted')">✓ Approve</button>
+              <button class="btn-reject" onclick="handleSuggestionDecision(${job.id}, '${blk.id}', 'rejected')">✕ Reject</button>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="track-changes-container">
+          <div class="paper-canvas">
+            ${paperHtml || '<div>No tailored resume content found.</div>'}
+          </div>
+          <div class="track-sidebar">
+            <div style="font-weight:700; font-size:12.5px; margin-bottom:8px; color:var(--muted); display:flex; justify-content:space-between;">
+              <span>Suggested Edits</span>
+              <span style="font-size:11px;">${blocks.filter(b=>b.type!=='equal').length} changes</span>
+            </div>
+            ${cardsHtml || '<div style="color:var(--muted); font-size:12px;">No suggestions.</div>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function setResumeViewMode(mode) {
+      resumeViewMode = mode;
+      if (selectedId) selectJob(selectedId);
+    }
+
+    function handleSuggestionDecision(jobId, blockId, decision) {
+      const blocks = trackedBlocksByJob[jobId] || [];
+      const blk = blocks.find(b => b.id === blockId);
+      if (blk) blk.status = decision;
+      selectJob(jobId);
+    }
+
+    function handleAllSuggestions(jobId, decision) {
+      const blocks = trackedBlocksByJob[jobId] || [];
+      for (const blk of blocks) {
+        if (blk.type !== 'equal') blk.status = decision;
+      }
+      selectJob(jobId);
+    }
+
+    function onJobStatusChange(jobId, newStatus) {
+      setStatusOverride(jobId, newStatus);
+      showToast(`Status updated to: ${newStatus}`);
+      renderMetrics();
+      renderJobList();
+      selectJob(jobId);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 2600);
+    }
+
+    function getPdfExportUrl(gdocUrl) {
+      if (!gdocUrl) return '';
+      const m = gdocUrl.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+      return m ? `https://docs.google.com/document/d/${m[1]}/export?format=pdf` : '';
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatRichText(text) {
+      return escapeHtml(text || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
